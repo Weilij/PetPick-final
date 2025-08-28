@@ -3,7 +3,7 @@ import http from '@/utils/http'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
-    userId: 101,
+    userId: 1,
     username: '',
     isLoggedIn: false,
   }),
