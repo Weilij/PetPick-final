@@ -39,7 +39,7 @@ export default createRouter({
     { path: '/missions', name: 'missions', component: MissionMain },
     { path: '/missions/:id', name: 'missionDetail', component: MissionDetail },
     { path: '/missions/upload', name: 'missionUpload', component: MissionUpload },
-    { path: '/missions/application', name: 'missionApplication', component: MissionApplication }
+    { path: '/missions/application', name: 'missionApplication', component: MissionApplication },
 
 
 
@@ -48,7 +48,7 @@ export default createRouter({
 
 
     //Account
-
+    {path: '/login',name: 'login',component: () => import('@/pages/Auth/Login.vue')}
 
 
     //Adopt
