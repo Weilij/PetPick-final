@@ -1,25 +1,31 @@
+// src/stores/user.js
 import { defineStore } from 'pinia'
-import http from '@/utils/http'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
     userId: 1,
     username: '',
-    isLoggedIn: false,
+    token: '',
   }),
+  getters: {
+    isLogin: (s) => !!s.token,
+  },
   actions: {
-    async login(username, password) {
-      const { data } = await http.post('/auth/login', { username, password })
-      this.userId = data.userId
-      this.username = data.username
-      this.isLoggedIn = true
-      localStorage.setItem('token', data.token) 
+    setUser({ userId, username, token }) {
+      this.userId = userId
+      this.username = username
+      this.token = token
+      localStorage.setItem('auth', JSON.stringify({ userId, username, token }))
+    },
+    load() {
+      const raw = localStorage.getItem('auth')
+      if (!raw) return
+      const { userId, username, token } = JSON.parse(raw)
+      this.userId = userId; this.username = username; this.token = token
     },
     logout() {
-      this.userId = null
-      this.username = ''
-      this.isLoggedIn = false
-      localStorage.removeItem('token')
+      this.$reset()
+      localStorage.removeItem('auth')
     }
   }
 })
