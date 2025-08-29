@@ -13,8 +13,8 @@ const Chat = () => import('../pages/Chat/Chat.vue')
 
 
 //Shop
-
-
+const Commodity = () => import('../pages/Shop/Commodity.vue')
+const ProductSite = () => import('../pages/Shop/ProductSite.vue')
 
 //Account
 
@@ -44,11 +44,12 @@ export default createRouter({
 
 
     //Shop
-
+    { path: '/shop/commodity', name: 'commodity', component: Commodity },
+    { path: '/product/:id', name: 'productDetail', component: ProductDetail, props: true },
 
 
     //Account
-    {path: '/login',name: 'login',component: () => import('@/pages/Auth/Login.vue')}
+    { path: '/login', name: 'login', component: () => import('@/pages/Auth/Login.vue') }
 
 
     //Adopt
