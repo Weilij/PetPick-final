@@ -1,6 +1,5 @@
 <template>
   <div class="container" style="margin-top: 90px;">
-    <!-- 登入表單 -->
     <div id="loginForm" class="auth-container fade-in active">
       <div class="auth-header">
         <div class="pet-icon"><i class="fas fa-heart"></i></div>
@@ -19,33 +18,18 @@
               <label for="username">
                 <i class="fas fa-envelope"></i> 電子信箱
               </label>
-              <input
-                id="username"
-                class="form-control"
-                type="text"
-                placeholder="input username"
-                v-model.trim="form.username"
-                required
-                autocomplete="username"
-              />
+              <input id="username" class="form-control" type="text" placeholder="input username"
+                v-model.trim="form.username" required autocomplete="username" />
             </div>
 
             <div class="form-group">
               <label for="password">
                 <i class="fas fa-lock"></i> 密碼
               </label>
-              <input
-                id="password"
-                class="form-control"
-                type="password"
-                placeholder=" input password"
-                v-model="form.password"
-                required
-                autocomplete="current-password"
-              />
+              <input id="password" class="form-control" type="password" placeholder=" input password"
+                v-model="form.password" required autocomplete="current-password" />
             </div>
 
-            <!-- 若後端有開啟 CSRF，建議在 index.html 放 meta，再由這裡帶入 -->
             <input v-if="csrf.param && csrf.token" type="hidden" :name="csrf.param" :value="csrf.token" />
 
             <p />
@@ -75,9 +59,7 @@
             <button class="button-account" @click="$router.push('/register')">立即註冊</button>
           </p>
           <p>
-            <button class="button-account" style="color:#6c757d;" @click="$router.push('/forgot-password')">
-              忘記密碼？
-            </button>
+            <router-link :to="{ name: 'forgotPassword' }" class="btn btn-link">忘記密碼？</router-link>
           </p>
         </div>
       </div>
@@ -88,14 +70,18 @@
 <script setup>
 import axios from '@/utils/http'
 import { reactive, ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const route = useRoute()
+const user = useUserStore()
+
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 const errorMessage = ref('')
 
-// 從 <meta> 讀 CSRF（如果你的 Spring Security 有開啟）
+// 從 <meta> 讀 CSRF（若 Spring Security 有開）
 const csrf = reactive({ param: '', token: '' })
 onMounted(() => {
   const p = document.querySelector('meta[name="_csrf_parameter"]')?.getAttribute('content') || ''
@@ -103,32 +89,46 @@ onMounted(() => {
   if (p && t) { csrf.param = p; csrf.token = t }
 })
 
-async function onSubmit () {
-  try {
-    loading.value = true
-    errorMessage.value = ''
+async function onSubmit() {
+  loading.value = true
+  errorMessage.value = ''
 
-    // Spring Security 預設 /login 接受 x-www-form-urlencoded
+  try {
+    // 1) Spring Security form-login
     const params = new URLSearchParams()
     params.append('username', form.username)
     params.append('password', form.password)
     if (csrf.param && csrf.token) params.append(csrf.param, csrf.token)
 
     await axios.post('/login', params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      withCredentials: true, // 若後端用 session
     })
 
-    // 成功就回首頁或你要的頁面
-    router.push('/')
+    // 2) 取回當前登入者（請依你的實際 API 調整）
+    // 期望回傳：{ userId, username, token? }；若是 session 流程，token 可忽略
+    const { data } = await axios.get('/api/auth/me', { withCredentials: true })
+
+    // 3) 寫入 Pinia（token 沒有就給空字串）
+    user.setUser({
+      userId: data.userId,
+      username: data.username,
+      token: data.token || ''
+    })
+
+    // 4) 跳回 redirect 或首頁
+    const redirect = route.query.redirect || '/'
+    router.replace(String(redirect))
   } catch (err) {
-    errorMessage.value = '帳號或密碼錯誤，請再試一次'
+    errorMessage.value = err?.response?.data?.message || '帳號或密碼錯誤，請再試一次'
   } finally {
     loading.value = false
   }
 }
 </script>
 
-<!-- 直接沿用你的全域 styles.css / chatroom.css；這裡僅保留必要覆蓋 -->
 <style scoped>
-.container { max-width: 680px; }
+.container {
+  max-width: 680px;
+}
 </style>

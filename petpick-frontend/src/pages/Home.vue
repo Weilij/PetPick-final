@@ -43,61 +43,104 @@
         </div>
     </section>
 
-    <!-- 最新消息區 -->
-    <section class="bg-white py-5">
-        <div class="container">
-            <h2 class="text-center mb-4">最新公告與活動</h2>
-            <ul class="list-group">
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    2025 中部大型領養會即將展開！<span class="badge badge-info">NEW</span>
-                </li>
-                <li class="list-group-item">「認養即贈物資」活動熱烈進行中</li>
-                <li class="list-group-item">5月會員招募計畫開跑，歡迎加入志工行列！</li>
-            </ul>
-        </div>
-    </section>
+   <!-- 最新消息區 -->
+<section class="py-5" style="background:linear-gradient(180deg,#ffffff 0%, #f6f8fb 100%);">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-4">
+      <i class="fas fa-bullhorn me-2"></i>最新公告與活動
+    </h2>
+    <ul class="list-group list-group-flush bg-transparent">
+      <li class="list-group-item d-flex justify-content-between align-items-center bg-white rounded-3 shadow-sm mb-3">
+        <div><span class="badge rounded-pill bg-warning text-dark me-2">活動</span>2025 中部大型領養會即將展開！</div>
+        <span class="badge bg-info text-dark">NEW</span>
+      </li>
+      <li class="list-group-item d-flex justify-content-between align-items-center bg-white rounded-3 shadow-sm mb-3">
+        <div><span class="badge rounded-pill bg-success me-2">公告</span>「認養即贈物資」活動熱烈進行中</div>
+        <small class="text-muted">更新於 3 天前</small>
+      </li>
+      <li class="list-group-item d-flex justify-content-between align-items-center bg-white rounded-3 shadow-sm">
+        <div><span class="badge rounded-pill bg-primary me-2">招募</span>5 月會員招募計畫開跑，歡迎加入志工行列！</div>
+        <small class="text-muted">更新於 1 週前</small>
+      </li>
+    </ul>
+  </div>
+</section>
 
-    <!-- 功能卡片 -->
-    <div class="container">
-        <div class="row text-center">
-            <div class="col-md-4">
-                <div class="card h-100 shadow-sm">
-                    <img src="../assets/homeImg/dog2.jpg" class="card-img-top" alt="認養服務">
-                    <div class="card-body">
-                        <h5 class="card-title">認養服務</h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card h-100 shadow-sm">
-                    <img src="../assets/homeImg/shop.jpg" class="card-img-top" alt="商城">
-                    <div class="card-body">
-                        <h5 class="card-title">商城</h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card h-100 shadow-sm">
-                    <img src="../assets/homeImg/report.jpg" class="card-img-top" alt="收養回報">
-                    <div class="card-body">
-                        <h5 class="card-title">收養回報</h5>
-                    </div>
-                </div>
-            </div>
+<!-- 功能卡片 -->
+<div class="container my-5">
+  <h2 class="text-center fw-bold mb-4"><i class="fas fa-paw me-2"></i>主要功能</h2>
+  <div class="row g-4 text-center">
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm feature-card">
+        <img src="../assets/homeImg/dog2.jpg" class="card-img-top" alt="認養服務">
+        <div class="card-body">
+          <h5 class="card-title fw-bold">認養服務</h5>
+          <p class="text-muted small mb-0">協助媒合合適的家庭與毛孩，提升領養成功率。</p>
         </div>
+      </div>
     </div>
-
-
-
-    <!-- 領養須知 -->
-    <div class="container">
-        <div class="section-title"><i class="fas fa-paw"></i>領養須知</div>
-        <div class="text-block text-center">
-            <p><strong>領養資格條件：</strong>年滿20歲、无棄養紀錄、居家環境適合、同意簽約與追蹤。</p>
-            <p><strong>認養流程：</strong>現場互動 ➜ 試養與磨合 ➜ 家訪審核 ➜ 正式辦理（簽切結書、植晶片、接種疫苗）</p>
-            <p><strong>領養後義務：</strong>晶片登記與健康檢查、提供適當飼養環境、出門牽繩或籠具、不得任意棄養、如無法續養須負責轉送或媒合。</p>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm feature-card">
+        <img src="../assets/homeImg/shop.jpg" class="card-img-top" alt="商城">
+        <div class="card-body">
+          <h5 class="card-title fw-bold">公益商城</h5>
+          <p class="text-muted small mb-0">購買指定品項，同步支持浪浪照護與救援。</p>
         </div>
+      </div>
     </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm feature-card">
+        <img src="../assets/homeImg/report.jpg" class="card-img-top" alt="收養回報">
+        <div class="card-body">
+          <h5 class="card-title fw-bold">收養回報</h5>
+          <p class="text-muted small mb-0">建立追蹤回報，確保動物福利與飼主責任。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 領養須知 -->
+<section class="py-5" style="background:#f9fbfd;">
+  <div class="container">
+    <h2 class="fw-bold mb-3"><i class="fas fa-book-open me-2"></i>領養須知</h2>
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="p-4 bg-white rounded-3 shadow-sm h-100">
+          <h6 class="fw-bold mb-2">資格條件</h6>
+          <ul class="mb-0 small text-muted">
+            <li>年滿 20 歲，具完全行為能力</li>
+            <li>無棄養或虐待紀錄</li>
+            <li>居家環境適合飼養</li>
+            <li>同意簽約並接受追蹤</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-4 bg-white rounded-3 shadow-sm h-100">
+          <h6 class="fw-bold mb-2">認養流程</h6>
+          <ol class="mb-0 small text-muted">
+            <li>現場互動與初步評估</li>
+            <li>試養觀察與磨合</li>
+            <li>家訪審核與確認</li>
+            <li>辦理手續（切結 / 晶片 / 疫苗）</li>
+          </ol>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-4 bg-white rounded-3 shadow-sm h-100">
+          <h6 class="fw-bold mb-2">領養後義務</h6>
+          <ul class="mb-0 small text-muted">
+            <li>完成晶片登記與健康檢查</li>
+            <li>提供安全合宜的生活空間</li>
+            <li>外出牽繩或使用籠具</li>
+            <li>不得棄養，無法續養請協助轉介</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 
     <!-- 右下角置頂按鈕 -->
