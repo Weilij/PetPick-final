@@ -37,14 +37,14 @@
                 <li><RouterLink class="dropdown-item" to="/gov/list">公立認養</RouterLink></li>
                 <li><RouterLink class="dropdown-item" to="/adopt/list">領養認養</RouterLink></li>
                 <li><RouterLink class="dropdown-item" to="/post/adopt">刊登送養</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink></li>
+                <!-- <li><RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink></li> -->
               </ul>
             </li>
             <li class="nav-item">
               <RouterLink class="nav-link btn btn-login m-1" to="/missions">尋找任務</RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink class="nav-link btn btn-login m-1" to="/commodity">寵物商城</RouterLink>
+              <RouterLink class="nav-link btn btn-login m-1" to="/shop/commodity">寵物商城</RouterLink>
             </li>
           </ul>
 
@@ -87,7 +87,7 @@
 
               <ul v-if="user.isLogin" class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="accountMenuBtn">
                 <li><RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/Commodity">我的訂單</RouterLink></li>
+                <li><RouterLink class="dropdown-item" to="/shop/commodity">我的訂單</RouterLink></li>
                 <li><RouterLink class="dropdown-item" to="/missions/my">我的任務</RouterLink></li>
                 <li><hr class="dropdown-divider" /></li>
                 <li><button class="dropdown-item text-danger" @click="logout">登出</button></li>
@@ -114,7 +114,7 @@ import { onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
-import Realtime from '@/common/realtime'
+// import Realtime from '@/common/realtime'
 import axios from '@/utils/http'
 
 const user = useUserStore()
@@ -129,7 +129,11 @@ onMounted(() => {
   user.load() // <--- 修正處：在這裡呼叫 load()
   
   // 啟動聊天未讀監聽（有 userId 時）
-  startRealtimeIfReady()
+  try {
+  globalThis.startRealtimeIfReady?.()
+} catch (e) {
+  console.warn('realtime init skipped:', e)
+}
   // 掛載時拉一次購物車數量
   if (user.userId) cart.refresh(user.userId)
 })
