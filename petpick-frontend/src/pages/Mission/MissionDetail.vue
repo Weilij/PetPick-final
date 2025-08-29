@@ -141,7 +141,7 @@ import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const userStore = useUserStore?.()
-const fallbackImg = '/images/default-avatar.png'
+const fallbackImg = '/assets/default-avatar.png'
 
 const m = ref(null)
 const images = ref([fallbackImg])

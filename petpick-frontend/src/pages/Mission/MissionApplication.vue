@@ -148,7 +148,7 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore?.()
 function currentUserId(){ return window.CURRENT_USER_ID ?? userStore?.userId ?? 1 }
 
-const fallbackImg = '/images/default-avatar.png'
+const fallbackImg = '/assets/default-avatar.png'
 
 // UI 狀態
 const activeTab = ref('all')
