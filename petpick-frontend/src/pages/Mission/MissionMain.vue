@@ -167,7 +167,7 @@ const regionOptions = ref(['地區'])
 const ALL = ref([])
 const VIEW = ref([])
 
-const FALLBACK_IMG = '/animal/default.jpg'
+const FALLBACK_IMG = '/assets/default.jpg'
 
 // 載入任務
 onMounted(async () => {
