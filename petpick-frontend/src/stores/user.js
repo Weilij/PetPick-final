@@ -48,8 +48,3 @@ export const useUserStore = defineStore('user', {
   }
 })
 
-// 在 store 初始化時載入資料
-if (import.meta.env.SSR) {
-  const userStore = useUserStore()
-  userStore.load()
-}
