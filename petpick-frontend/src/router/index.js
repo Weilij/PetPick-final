@@ -24,7 +24,7 @@ const RegisterSuccess = () => import('../pages/Auth/RegisterSuccess.vue')
 //Shop
 const Commodity = () => import('../pages/Shop/Commodity.vue')
 const ProductSite = () => import('../pages/Shop/ProductSite.vue')
-
+const cart = () => import('@/pages/Shop/cart.vue')
 //Account
 
 
@@ -58,9 +58,9 @@ const router = createRouter({
     { path: '/register-success', name: 'registerSuccess', component: RegisterSuccess },
 
     //Shop
-    { path: '/shop/commodity', name: 'commodity', component: Commodity },
-    { path: '/product/:id', name: 'productDetail', component: ProductDetail, props: true },
-
+    { path: '/commodity', name: 'commodity', component: Commodity },
+    { path: '/product/:id', name: 'productSite', component: ProductSite, props: true },
+    { path: '/cart', name: 'cart', component: cart },
 
     //Account
     { path: '/login', name: 'login', component: () => import('@/pages/Auth/Login.vue') },

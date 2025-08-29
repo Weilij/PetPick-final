@@ -59,7 +59,7 @@
               <span
                 v-if="cart.itemsCount > 0"
                 class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill"
-                style="min-width: 20px;"
+                style="min-width:20px;"
               >{{ cart.itemsCount }}</span>
             </RouterLink>
 
@@ -88,7 +88,11 @@
 
               <!-- 未登入選單 -->
               <ul v-else class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="accountMenuBtn">
-                <li><RouterLink class="dropdown-item" :to="{ name: 'login', query: { redirect: route.fullPath } }">登入</RouterLink></li>
+                <li>
+                  <RouterLink class="dropdown-item" :to="{ name: 'login', query: { redirect: route.fullPath } }">
+                    登入
+                  </RouterLink>
+                </li>
                 <li><RouterLink class="dropdown-item" to="/register">註冊</RouterLink></li>
               </ul>
             </div>
@@ -130,18 +134,24 @@ function startRealtimeIfReady () {
   realtimeStarted = true
 }
 
-onMounted(() => startRealtimeIfReady())
+onMounted(() => {
+  // 啟動聊天未讀監聽（有 userId 時）
+  startRealtimeIfReady()
+  // 掛載時拉一次購物車數量（Pinia store 內要實作 refresh(userId)）
+  if (user.userId) cart.refresh(user.userId)
+})
 
 watch(
   () => user.userId,
-  () => {
-    // 使用者切換時重啟一次
+  (uid) => {
+    // 使用者切換：重啟聊天監聽 + 重拉購物車
     if (typeof disposeRealtime === 'function') {
       disposeRealtime()
       disposeRealtime = null
     }
     realtimeStarted = false
     startRealtimeIfReady()
+    if (uid) cart.refresh(uid)
   }
 )
 
@@ -162,14 +172,29 @@ async function logout () {
   unread?.classList.add('d-none')
   normal?.classList.remove('d-none')
 
+  // 清購物車徽章（可選：也可在 user.clearUser() 內處理）
+  cart.reset?.()
+
   router.replace({ path: '/login', query: { redirect: route.fullPath } })
 }
 </script>
 
 <style scoped>
 /* 針對右上角 icon 的微調，避免點擊範圍過小 */
-.btn.btn-material {
-  padding: 8px 10px;
-}
+.btn.btn-material { padding: 8px 10px; }
 .navbar-brand { letter-spacing: .3px; }
+
+.btn-login {
+    background-color: #d19f72;
+    border-radius: 30px;
+    padding: 6px 16px;
+    font-weight: bold;
+    border: none;
+    transition: 0.3s;
+}
+
+.btn-login:hover {
+    background-color: #b9845e;
+    color: #4e4e4e;
+}
 </style>

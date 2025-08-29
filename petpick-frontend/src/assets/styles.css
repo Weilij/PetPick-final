@@ -139,6 +139,7 @@ section {
 
 .btn-login:hover {
     background-color: #b9845e;
+    color: #4e4e4e;
 }
 
 /* 手機版導覽列改為直式 */
@@ -514,7 +515,6 @@ select {
     transition: all 0.3s ease;
     font-weight: 500;
 }
-
 .btn-primary {
     background-color: #e67e22;
     color: white;

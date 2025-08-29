@@ -12,7 +12,9 @@
       <div class="fw-bold text-danger">
         NT$ {{ price?.toLocaleString?.('zh-Hant-TW') ?? price }}
       </div>
-      <button class="btn btn-outline-primary btn-sm" @click="$emit('add')">加入</button>
+      <button class="btn btn-material" @click="$emit('add')">
+        <span class="material-icons">add_shopping_cart</span>
+      </button>
     </div>
   </div>
 </template>
@@ -28,3 +30,18 @@ defineProps({
 })
 defineEmits(['add'])
 </script>
+
+<style scoped>
+
+.btn-material :hover {
+    background-color: burlywood;
+    border-radius: 50%;
+    border: none;
+    transition: 0.3s;
+}
+
+.btn-material {
+    border: none;
+    transition: 0.3s;
+}
+</style>
