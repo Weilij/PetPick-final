@@ -65,7 +65,7 @@
 
 <script setup>
 import { reactive, ref, computed } from 'vue'
-import axios from '@/utils/http' // 你現有的 axios 包
+import axios from '@/utils/http' 
 
 const form = reactive({
     email: '',
@@ -83,7 +83,6 @@ const isEmailValid = computed(() =>
 
 const captchaSrc = ref(getCaptchaSrc())
 function getCaptchaSrc() {
-    // 後端 captcha 圖：加時間戳避免快取
     return `/captcha-image?_=${Date.now()}`
 }
 function refreshCaptcha() {
