@@ -27,8 +27,23 @@
 
           <!-- 左側按鈕 -->
           <ul class="navbar-nav mb-2 mb-lg-0">
-            <li class="nav-item">
-              <RouterLink class="nav-link btn btn-login m-1" to="/adoptions">尋找領養</RouterLink>
+            <!-- dropdown -->
+            <li class="nav-item dropdown">
+              <button
+                class="nav-link btn btn-login m-1 dropdown-toggle"
+                id="adoptDropdown"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                type="button"
+              >
+                尋找領養
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="adoptDropdown">
+                <li><RouterLink class="dropdown-item" to="/gov/list">公立認養</RouterLink></li>
+                <li><RouterLink class="dropdown-item" to="/adopt/list">領養認養</RouterLink></li>
+                <li><RouterLink class="dropdown-item" to="/post/adopt">刊登送養</RouterLink></li>
+                <li><RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink></li>
+              </ul>
             </li>
             <li class="nav-item">
               <RouterLink class="nav-link btn btn-login m-1" to="/missions">尋找任務</RouterLink>
