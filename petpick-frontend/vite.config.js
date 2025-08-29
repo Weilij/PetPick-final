@@ -9,7 +9,14 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': { target: 'http://localhost:8080', changeOrigin: true },
-      '/ws': { target: 'http://localhost:8080',  changeOrigin: true, ws: true }
+      '/adopts': { target: 'http://localhost:8080', changeOrigin: true },
+      '/pets': { target: 'http://localhost:8080', changeOrigin: true },
+      '/shelters': { target: 'http://localhost:8080', changeOrigin: true },
+      '/kinds': { target: 'http://localhost:8080', changeOrigin: true },
+      '/sexes': { target: 'http://localhost:8080', changeOrigin: true },
+      '/ages': { target: 'http://localhost:8080', changeOrigin: true },
+      '/auth': { target: 'http://localhost:8080', changeOrigin: true },
+      '/ws': { target: 'http://localhost:8080', changeOrigin: true, ws: true }
     }
   }
 })
