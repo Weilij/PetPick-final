@@ -20,7 +20,7 @@
         <div class="col-md-auto">
           <select v-model="filters.sex" class="form-select rounded-pill px-4" @change="gotoFirstAndLoad">
             <option value="">所有性別</option>
-            <option v-for="s in sexes" :key="s" :value="s">{{ sexMap[s.toUpperCase()] || s }}</option>
+            <option v-for="s in sexes" :key="s" :value="s">{{ sexLabel(s) }}</option>
           </select>
         </div>
         <div class="col-md-auto">
@@ -44,7 +44,8 @@
       </div>
     </div>
 
-    <div class="row" id="pet-list">
+    <!-- 列表 -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4" id="pet-list">
       <div v-if="loading" class="col-12 text-center text-muted my-5">資料載入中…</div>
 
       <template v-else>
@@ -52,31 +53,38 @@
           找不到符合條件的毛孩喔！
         </div>
 
-        <div v-for="pet in pets" :key="pet.animal_subid" class="col-12 col-sm-6 col-md-4 mb-4">
-          <div class="card pet-card">
-            <img
-              :src="pet.album_file"
-              class="card-img-top"
-              alt="毛孩照片"
-              @error="onImgError"
-            />
-            <div class="card-body">
+        <div v-for="pet in pets" :key="pet.animal_subid" class="col">
+          <div class="card pet-card h-100">
+            <!-- 固定高圖片區 -->
+            <div class="pet-photo">
+              <img
+                :src="pet.album_file"
+                class="pet-img"
+                alt="毛孩照片"
+                @error="onImgError"
+              />
+            </div>
+
+            <div class="card-body d-flex flex-column">
               <h5 class="card-title">
                 {{ translateBodytype(pet.animal_bodytype) }}
                 {{ pet.animal_colour }}
-                <span v-html="getSexIcon(pet.animal_sex)"></span>{{ pet.animal_Variety }}
+                <img v-if="sexUrl(pet.animal_sex)" :src="sexUrl(pet.animal_sex)" class="sex-icon" alt="" />
+                {{ pet.animal_Variety }}
                 {{ getAnimalIcon(pet.animal_Variety) }}
               </h5>
-              <p class="card-text">
+
+              <p class="card-text flex-grow-1">
                 <strong>收容編號：</strong>{{ pet.animal_subid }}<br />
                 <strong>收容所：</strong>{{ pet.animal_place }}<br />
                 <strong>電話：</strong>{{ pet.shelter_tel }}<br />
                 <strong>地址：</strong>{{ pet.shelter_address }}<br />
                 <strong>年齡：</strong>{{ translateAge(pet.animal_age) }}<br />
-                <strong>備註：</strong>{{ pet.animal_remark || '無' }}<br />
-                <span v-if="!getSexIcon(pet.animal_sex)" class="text-danger">＊未提供性別資訊</span>
+                <strong>備註：</strong><span class="remark">{{ pet.animal_remark || '無' }}</span><br />
+                <span v-if="!sexUrl(pet.animal_sex)" class="text-danger">＊未提供性別資訊</span>
               </p>
-              <a class="btn btn-warning btn-sm" :href="`tel:${pet.shelter_tel}`">撥打電話</a>
+
+              <a class="btn btn-warning btn-sm mt-auto" :href="`tel:${pet.shelter_tel}`">撥打電話</a>
             </div>
           </div>
         </div>
@@ -102,6 +110,7 @@
       </div>
     </div>
 
+    <!-- 置頂 -->
     <nav>
       <ul class="pagination justify-content-center mt-3" id="pagination">
         <li class="page-item" :class="{ disabled: page.number === 0 }">
@@ -129,7 +138,6 @@
       </ul>
     </nav>
 
-    <!-- 置頂 -->
     <button id="backToTop" class="btn btn-primary shadow" v-show="showBackToTop" @click="scrollTop">↑</button>
   </main>
 </template>
@@ -137,17 +145,13 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 
-const API_BASE = '' // 若已設 Vite 代理 /api → 後端，這裡留空就好
+const API_BASE = '' // 已設 Vite 代理 /api → 後端，留空即可
 
 const pageSize = 12
 const loading = ref(false)
 const pets = ref([])
 
-const page = reactive({
-  number: 0,
-  totalPages: 1,
-})
-
+const page = reactive({ number: 0, totalPages: 1 })
 const gotoPage = ref()
 const gotoInvalid = ref(false)
 
@@ -166,14 +170,14 @@ const kinds = ref([])
 const sexes = ref([])
 const ages = ref([])
 
-const sexMap = { M: '公', F: '母' }
+const sexMap = { M: '公', F: '母', N: '不詳', U: '不詳', UNKNOWN: '不詳' }
+const sexLabel = (x) => sexMap[String(x || '').toUpperCase()] ?? x
 const ageMap = { CHILD: '幼年', ADULT: '成年' }
 
-const getSexIcon = (sex) => {
-  if (!sex || typeof sex !== 'string') return ''
-  const s = sex.toLowerCase()
-  if (s.includes('f') || s.includes('母')) return '<span class="sex-icon"><img src="/images/female.png" alt="母" /></span>'
-  if (s.includes('m') || s.includes('公')) return '<span class="sex-icon"><img src="/images/male.png" alt="公" /></span>'
+const sexUrl = (sex) => {
+  const s = String(sex || '').toLowerCase()
+  if (s.includes('f') || s.includes('母')) return '/images/female.png'
+  if (s.includes('m') || s.includes('公')) return '/images/male.png'
   return ''
 }
 
@@ -221,11 +225,8 @@ const loadPets = async () => {
   loading.value = true
   try {
     const u = buildUrl().toString()
-    console.log('[pets] GET', u)            // 打去哪
     const res = await fetch(u)
-    console.log('[pets] status', res.status)
     const data = await res.json()
-    console.log('[pets] data', data)        // 後端回什麼
     pets.value = data.content || []
     page.number = data.number ?? 0
     page.totalPages = data.totalPages ?? 1
@@ -287,21 +288,20 @@ const showBackToTop = ref(false)
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 onMounted(async () => {
-  // 置頂顯示控制
   window.addEventListener('scroll', () => {
     showBackToTop.value = window.scrollY > 200
   })
-
-  // 載入下拉 & 列表
   await Promise.all([loadShelters(), loadKinds(), loadSexes(), loadAges()])
   await loadPets()
 })
 </script>
 
 <style scoped>
-/* 取自你原本的 gov-list.css，略微調整為 scoped */
-
+/* 固定卡片與圖片區高度 + 一致化外觀 */
 .pet-card {
+  display: flex;
+  flex-direction: column;
+  height: 520px;                 /* ← 卡片統一高度，可自行微調 */
   border: 1px solid #ddd;
   border-radius: 16px;
   overflow: hidden;
@@ -312,14 +312,23 @@ onMounted(async () => {
   transform: scale(1.03);
   box-shadow: 0 12px 24px rgba(0,0,0,0.15);
 }
-.pet-card img {
-  width: 100%;
-  height: 250px;
-  object-fit: contain;
+
+/* 圖片容器固定高，圖片等比縮放置中 */
+.pet-photo {
+  height: 240px;                 /* ← 圖片區統一高度，可自行微調 */
   background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px;
 }
+.pet-img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
 
+/* 表單外觀 */
 select.form-select, input.form-control {
   border-radius: 20px;
   padding: 10px 16px;
@@ -332,6 +341,7 @@ select.form-select:focus, input.form-control:focus {
   box-shadow: 0 0 0 0.2rem rgba(209,159,114,0.3);
 }
 
+/* 按鈕 */
 .pet-card .btn.btn-warning {
   background-color: #d19f72;
   border-radius: 30px;
@@ -341,6 +351,7 @@ select.form-select:focus, input.form-control:focus {
 }
 .pet-card .btn.btn-warning:hover { background-color: #b9845e; }
 
+/* 頁碼外觀 */
 #page-info { font-weight: bold; color: #666; }
 .input-group .form-control { border-left: none; border-radius: 0; }
 .input-group .btn { border-radius: 0 30px 30px 0; background-color: #d19f72; border: none; font-weight: 500; }
@@ -361,12 +372,21 @@ select.form-select:focus, input.form-control:focus {
 .pagination .page-link:hover { background-color: #f7e4c3; color: #5a3f29; }
 .page-item.active .page-link { background-color: #d2b48c; border-color: #d2b48c; color: #fff; }
 
-.sex-icon img {
+/* 性別 icon */
+.sex-icon {
   height: 18px; width: 18px; object-fit: contain; vertical-align: middle;
-  margin: 0 4px; background-color: #fff; border-radius: 50%; padding: 1px; border: 1px solid #ccc;
+  margin: 0 4px; background-color: transparent; border: 0; padding: 0;
 }
 
-/* 置頂按鈕，沿用你原本 id 與樣式想法 */
+/* 備註只顯示 6 行，避免撐高 */
+.remark {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 置頂按鈕 */
 #backToTop {
   position: fixed; right: 24px; bottom: 24px; display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 44px; border-radius: 50%;

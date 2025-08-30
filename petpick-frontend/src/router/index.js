@@ -30,6 +30,7 @@ const ProductSite = () => import('../pages/Shop/ProductSite.vue')
 
 
 //Adopt
+const AdoptView = () => import('../pages/Adopt/AdoptView.vue')
 
 // Admin
 const AdminDashboard = () => import('../pages/Admin/AdminDashboard.vue')
@@ -71,6 +72,12 @@ const router = createRouter({
     { path: '/adopt/list', name: 'AdoptList', component: () => import('@/pages/Adopt/AdoptList.vue') },
     { path: '/post/adopt', name: 'PostAdopt', component: () => import('@/pages/Adopt/PostAdopt.vue') },
     // { path: '/adopt/report', name: 'AdoptReport', component: () => import('@/pages/Adopt/AdoptReport.vue') },
+
+    // ✅ 新增：詳情頁（支援 query 形式）
+    { path: '/adopt/view', name: 'AdoptView', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
+
+    // （可選）支援 REST 風格網址 /adopt/:id
+    { path: '/adopt/:id', name: 'AdoptViewById', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
 
     // Admin（需要登入）
     { path: '/admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
