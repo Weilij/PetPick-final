@@ -1,5 +1,5 @@
 <template>
-  <main class="container mt-5 pt-5">
+  <main class="post-adopt-page container mt-5 pt-5">
     <!-- Stepper -->
     <div class="row text-center mb-4">
       <div class="col">
@@ -184,12 +184,6 @@
               </div>
             </div>
 
-            <div class="form-check mt-3">
-              <input class="form-check-input" type="checkbox" id="agreeTerms" v-model="agree" :class="{ 'is-invalid': triedSubmit && !agree }">
-              <label class="form-check-label" for="agreeTerms">我已閱讀並同意條款與注意事項</label>
-              <div class="invalid-feedback">請勾選同意條款</div>
-            </div>
-
             <div class="text-center mt-4">
               <button class="btn btn-submit btn-outline-secondary px-4" :disabled="submitting">
                 {{ submitting ? '送出中…' : '送出' }}
@@ -206,20 +200,42 @@
             <div class="card-header text-white">刊登條款與注意事項</div>
             <div class="card-body">
               <ul class="mb-3">
-                <li>刊登人使用由 PetPick 平台所提供之送養資訊刊登服務，均受到本「刊登條款」規範。</li>
+                  <li>刊登人使用由 PetPick 寵物資訊平台(以下簡稱「Petpick」)所提供之送養資訊刊登服務(以下簡稱「本服務」)時，均受到本「刊登條款」規範。
+                  </li>
               </ul>
-              <ol>
-                <li>需註冊並驗證手機；如有虐待等異常，平台將配合提供必要紀錄。</li><br>
-                <li>確定送養後請關閉送養資訊，避免困擾。</li><br>
-                <li>不開放未開眼幼齡動物送養。</li><br>
-                <li>平台僅為資訊交流，刊登內容之正確性與行為由刊登人自負。</li><br>
-                <li>平台不承擔線下交易後續問題，請自留聯繫紀錄。</li><br>
-                <li>平台保有篩選、修改、刪除與決定刊登與否之權利。</li><br>
-                <li>禁止索取任何費用、捏造資訊、或惡意收集個資等行為，違反者將處分。</li><br>
-                <li>請確認未侵權之文字、圖片、影音等素材。</li><br>
-                <li>同意授權本服務內容可被分享、轉載或推廣。</li>
-              </ol>
-            </div>
+                  <ol>
+                      <li>PetPick
+                          要求所有刊登送養資訊及查看送養資訊者均須加入會員且強制驗證手機號碼，是為了保證所有查看資訊的人都確實的留下紀錄，請送養人注意，如將動物送養後有查覺異常或有任何虐待事項，請立即通報政府單位，我們將配合政府單位之發文要求提供相關紀錄資料。
+                      </li><br>
+                      <li>送養資訊不限刊登時間，因此將動物確定送養後請回網站關閉送養資訊，避免造成自身困擾。</li><br>
+                      <li>目前不開放剛出生或尚未開眼之動物送養。</li><br>
+                      <li>PetPick 僅為資訊交流平台，無法保證刊登內容之正確性，刊登人對其刊登內容及送養之行為應負完全之責任，刊登人應提供確實之刊登內容，並自負相關法律責任。</li>
+                      <br>
+                      <li>平台不承擔線下交易與後續問題，請自留聯繫紀錄。</li><br>
+                      <li>PetPick 對刊登資訊保有最終篩選、修改、刪除及決定刊登與否之權利。</li><br>
+                      <li>PetPick 秉持以領養代替購買之精神，禁止以下類型之刊登內容：
+                          <br>a.要求補貼、認養價、營養費、結紮費等一切任何額外費用或有實際販賣行為。<br>
+                          b.捏造不實資訊。<br>
+                          c.特意收集個人資料。<br>
+                          如有違反上述條款之情事，Wepet 可能將其進行會員停權或封鎖之處置。
+                      </li><br>
+                      <li>刊登人應確定刊登之內容未使用未經授權之文字、圖片、影音或任何形式之資訊。</li><br>
+                      <li>刊登人同意授權於本服務刊登之資訊內容無償提供第三人分享、轉載或推廣。</li>
+                  </ol>
+                  <div class="form-check mt-2 terms-check">
+                    <input class="form-check-input"
+                          type="checkbox"
+                          id="agreeTerms"
+                          v-model="agree"
+                          :class="{ 'is-invalid': triedSubmit && !agree }">
+                    <label class="form-check-label" for="agreeTerms">
+                      我已閱讀並同意條款與注意事項
+                    </label>
+                    <div v-if="triedSubmit && !agree" class="invalid-feedback d-block">
+                      請勾選同意條款
+                    </div>
+                  </div>
+              </div>
           </div>
 
           <div class="card shadow-sm">
@@ -369,4 +385,101 @@ onMounted(() => {
 /* 右側固定 */
 .sticky-sidebar{ position:sticky; top:88px; }
 #backToTop{ position:fixed; right:16px; bottom:16px; }
+
+.post-adopt-page .btn{
+  padding: 6px 16px;
+  border-radius: 30px;   /* 膠囊圓角 */
+  font-weight: 600;
+}
+
+/* 「上傳」「送出」等主要行動：走品牌色 */
+.post-adopt-page .btn-outline-secondary{
+  background-color: #d19f72;
+  color: #fff;
+  border: none;
+}
+.post-adopt-page .btn-outline-secondary:hover{
+  background-color: #b9845e;
+  color: #fff;
+}
+
+/* input-group 裡的「上傳」按鈕也做圓角收尾（看起來更一致） */
+.post-adopt-page .input-group .form-control{
+  border-radius: 30px 0 0 30px;
+}
+.post-adopt-page .input-group .btn{
+  border-radius: 0 30px 30px 0;
+}
+
+/* 右下角回到頂部，統一品牌色調 */
+.post-adopt-page #backToTop.btn-primary{
+  background-color: #d19f72;
+  border: none;
+}
+.post-adopt-page #backToTop.btn-primary:hover{
+  background-color: #b9845e;
+}
+
+/* 提交中的樣式微調（可選） */
+.post-adopt-page .btn:disabled{
+  opacity: .75;
+  cursor: not-allowed;
+}
+
+.post-adopt-page {
+  --brand: #d19f72;
+  --brand-hover: #b9845e;
+}
+
+/* input / select / textarea 共用外觀（膠囊圓角 + 淺陰影） */
+.post-adopt-page :is(.form-control, .form-select, textarea.form-control) {
+  /* 兩種都設，避免被 Bootstrap 變數吃掉 */
+  --bs-border-radius: 30px;
+  border-radius: 30px;
+
+  padding: 10px 16px;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  transition: border-color .2s ease, box-shadow .2s ease;
+  background-color: #fff;
+}
+
+/* 聚焦時用品牌色 */
+.post-adopt-page :is(.form-control, .form-select, textarea.form-control):focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 .2rem rgba(209,159,114,.30);
+}
+
+/* placeholder 顏色（可要可不要） */
+.post-adopt-page ::placeholder {
+  color: #9aa2a9;
+}
+
+/* disabled 的底色微灰 */
+.post-adopt-page :is(.form-control, .form-select)[disabled],
+.post-adopt-page :is(.form-control, .form-select):disabled {
+  background-color: #f6f6f6;
+  opacity: 1; /* 保持可讀 */
+}
+
+/* 驗證錯誤：紅框但保留圓角 */
+.post-adopt-page .is-invalid {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 .2rem rgba(220,53,69,.15) !important;
+}
+
+/* input-group（URL + 上傳）左圓右圓 */
+.post-adopt-page .input-group .form-control {
+  border-radius: 30px 0 0 30px !important;
+}
+.post-adopt-page .input-group .btn,
+.post-adopt-page .input-group .input-group-text {
+  border-radius: 0 30px 30px 0 !important;
+}
+
+/* 避免 select 箭頭區被裁切（少數瀏覽器） */
+.post-adopt-page .form-select {
+  background-clip: padding-box;
+}
+
 </style>

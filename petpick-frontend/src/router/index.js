@@ -71,12 +71,10 @@ const router = createRouter({
     { path: '/gov/list', name: 'GovList', component: () => import('@/pages/Adopt/GovList.vue'), meta: { title: '公立認養 - PetPick' } },
     { path: '/adopt/list', name: 'AdoptList', component: () => import('@/pages/Adopt/AdoptList.vue') },
     { path: '/post/adopt', name: 'PostAdopt', component: () => import('@/pages/Adopt/PostAdopt.vue') },
+    { path: '/my-adopt-progress', name: 'MyAdoptProgress', component: () => import('@/pages/Adopt/MyAdoptProgress.vue') },
+    { path: '/my-apply', name: 'MyApply', component: () => import('@/pages/Adopt/MyApply.vue') },
     // { path: '/adopt/report', name: 'AdoptReport', component: () => import('@/pages/Adopt/AdoptReport.vue') },
-
-    // ✅ 新增：詳情頁（支援 query 形式）
     { path: '/adopt/view', name: 'AdoptView', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
-
-    // （可選）支援 REST 風格網址 /adopt/:id
     { path: '/adopt/:id', name: 'AdoptViewById', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
 
     // Admin（需要登入）

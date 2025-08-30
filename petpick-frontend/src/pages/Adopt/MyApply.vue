@@ -1,88 +1,71 @@
 <template>
-  <main class="container mt-5 pt-4 py-4">
-    <!-- 跨頁切換 -->
-    <div class="btn-group mb-3" id="tabs-cross">
-      <RouterLink class="btn btn-outline-secondary"
-                  :class="{ active: tabActive === 'post' }"
-                  :to="{ name: 'my-adopt-progress', query: { status: 'pending' } }">
-        我的刊登
-      </RouterLink>
-      <RouterLink class="btn btn-outline-secondary"
-                  :class="{ active: tabActive === 'apply' }"
-                  :to="{ name: 'my-apply', query: { status: state.status || 'pending', page: state.page } }">
-        我的申請
-      </RouterLink>
+  <main class="container my-apply-page mt-5 pt-4 py-4">
+    <!-- 交叉分頁：我的刊登 / 我的申請（單一膠囊） -->
+    <div class="tabs-pills mb-3">
+      <RouterLink
+        class="btn"
+        :class="{ active: route.name === 'MyAdoptProgress' }"
+        to="/my-adopt-progress?status=pending"
+      >我的刊登</RouterLink>
+      <RouterLink
+        class="btn"
+        :class="{ active: route.name === 'MyApply' }"
+        to="/my-apply?status=pending"
+      >我的申請</RouterLink>
     </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
       <h3 class="mb-0">我的領養申請</h3>
 
-      <!-- 狀態過濾 -->
-      <form id="filters" class="row g-2">
-        <div class="col-12 col-sm-8">
-          <label class="form-label mb-1">狀態</label>
-          <div id="tabs-status" class="btn-group btn-group-sm d-flex">
-            <button type="button" class="btn btn-outline-secondary flex-fill"
-                    :class="{ active: state.status === 'all' }" @click="setStatus('all')">全部</button>
-            <button type="button" class="btn btn-outline-secondary flex-fill"
-                    :class="{ active: state.status === 'pending' }" @click="setStatus('pending')">審核中</button>
-            <button type="button" class="btn btn-outline-secondary flex-fill"
-                    :class="{ active: state.status === 'approved' }" @click="setStatus('approved')">已通過</button>
-            <button type="button" class="btn btn-outline-secondary flex-fill"
-                    :class="{ active: state.status === 'rejected' }" @click="setStatus('rejected')">已退回</button>
-            <button type="button" class="btn btn-outline-secondary flex-fill"
-                    :class="{ active: state.status === 'cancelled' }" @click="setStatus('cancelled')">已取消</button>
-          </div>
-        </div>
-      </form>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <div id="resultCount" class="text-muted small">{{ pageInfo }}</div>
-      <div id="pager" class="btn-group btn-group-sm">
-        <button class="btn btn-outline-secondary" :disabled="pageNum <= 0" @click="goPrev">上一頁</button>
-        <button class="btn btn-outline-secondary" :disabled="pageNum >= pageMax" @click="goNext">下一頁</button>
+      <!-- 狀態 segmented（同一顆） -->
+      <div class="tabs-pills tabs-small">
+        <button class="btn" :class="{active: state.status==='all'}" @click="setStatus('all')">全部</button>
+        <button class="btn" :class="{active: state.status==='pending'}" @click="setStatus('pending')">審核中</button>
+        <button class="btn" :class="{active: state.status==='approved'}" @click="setStatus('approved')">已通過</button>
+        <button class="btn" :class="{active: state.status==='rejected'}" @click="setStatus('rejected')">已退回</button>
+        <button class="btn" :class="{active: state.status==='cancelled'}" @click="setStatus('cancelled')">已取消</button>
       </div>
     </div>
 
-    <div id="empty" class="alert alert-secondary" v-if="!loading && items.length === 0">目前沒有申請。</div>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="text-muted small">{{ resultText }}</div>
+      <div class="tabs-pills tabs-small" v-if="page.totalPages > 1">
+        <button class="btn" :disabled="page.number<=0" @click="go(page.number-1)">上一頁</button>
+        <button class="btn" :disabled="page.number>=page.totalPages-1" @click="go(page.number+1)">下一頁</button>
+      </div>
+    </div>
 
-    <div class="row g-3" id="list">
+    <div class="alert alert-secondary" v-if="!loading && items.length===0">目前沒有申請。</div>
+
+    <div class="row g-3">
       <div v-for="a in items" :key="a.id" class="col-12">
         <div class="card shadow-sm">
           <div class="row g-0">
             <div class="col-md-4">
-              <div class="thumb-box bg-contain"
-                   :style="{ backgroundImage:`url('${firstImg(a.post)}')` }"></div>
+              <div class="thumb-box bg-contain" :style="{backgroundImage:`url('${firstImg(a.post)}')`}"></div>
             </div>
             <div class="col-md-8">
               <div class="card-body">
                 <h5 class="card-title mb-2 d-flex justify-content-between align-items-center position-relative">
-                  <RouterLink class="stretched-link text-decoration-none"
-                              :to="`/adopt/view/${a.post?.id ?? ''}`">
+                  <RouterLink
+                    class="stretched-link text-decoration-none"
+                    :to="`/adopt/view?id=${a.post?.id}`"
+                  >
                     {{ a.post?.title || '未命名' }} │ {{ a.post?.breed || a.post?.species || '' }}
                   </RouterLink>
                   <span v-html="badge(a.status)"></span>
                 </h5>
 
-                <div class="d-flex gap-2 action-area">
-                  <button v-if="a.status === 'pending'"
-                          class="btn btn-outline-danger btn-sm"
-                          @click.stop="cancelApply(a.id)">
-                    取消申請
-                  </button>
-                </div>
-
                 <div class="small text-muted mb-1">{{ place(a.post) }}</div>
                 <div class="small mb-2">動物：{{ animalLine(a.post) || '—' }}</div>
                 <div class="text-muted mb-3">申請時間：{{ dt(a.createdAt) }}</div>
 
-                <div class="d-flex gap-2">
-                  <button v-if="a.status === 'pending'"
-                          class="btn btn-outline-danger btn-sm"
-                          @click.stop="cancelApply(a.id)">
-                    取消申請
-                  </button>
+                <div class="d-flex gap-2 action-area">
+                  <button
+                    v-if="a.status==='pending'"
+                    class="btn btn-outline-danger btn-sm"
+                    @click.stop="cancelApply(a.id)"
+                  >取消申請</button>
                 </div>
               </div>
             </div>
@@ -90,112 +73,159 @@
         </div>
       </div>
     </div>
+
+    <!-- loading -->
+    <div v-if="loading" class="text-center text-muted my-5">資料載入中…</div>
   </main>
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import axios from '@/utils/http'
-import { useUserStore } from '@/stores/user'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute, RouterLink } from 'vue-router'
 
 const route = useRoute()
-const router = useRouter()
-const user = useUserStore()
 
-const tabActive = ref('apply')
-const items = ref([])
-const loading = ref(false)
-const fallback = '/images/no-image.jpg'
+// ===== 模擬登入（後端現在上不去就不擋頁面）=====
+const auth = ref({ loggedIn: true, role: 'USER' })
+async function getAuth() {
+  try {
+    const r = await fetch('/api/auth/status', { credentials: 'include' })
+    if (r.ok) {
+      const data = await r.json()
+      auth.value = { loggedIn: !!data.loggedIn, role: data?.role || 'USER' }
+    }
+  } catch { /* 失敗就維持 loggedIn:true，不擋頁面 */ }
+}
 
+// ===== 查詢狀態 =====
 const state = reactive({
-  page: +(route.query.page || 0),
+  page: +(new URL(location.href).searchParams.get('page') || 0),
   size: 12,
-  status: route.query.status || 'pending',
+  status: new URL(location.href).searchParams.get('status') || 'pending'
 })
-
-const pageNum = computed(() => state.page)
-const pageMax = ref(0)
-const pageInfo = ref('')
 
 function setStatus(s) {
   state.status = s
   state.page = 0
-  pushUrl()
+  syncUrl(true)
   load()
 }
-function goPrev() { state.page = Math.max(0, state.page - 1); pushUrl(); load() }
-function goNext() { state.page = Math.min(pageMax.value, state.page + 1); pushUrl(); load() }
 
-function pushUrl() {
-  router.replace({ name: 'my-apply', query: { status: state.status, page: state.page } })
+function syncUrl(push=false){
+  const p = new URLSearchParams()
+  p.set('page', state.page); p.set('size', state.size)
+  if (state.status && state.status!=='all') p.set('status', state.status)
+  const url = `/my-apply?${p.toString()}`
+  push ? history.pushState(null,'',url) : history.replaceState(null,'',url)
 }
 
-function badge(s) {
-  if (s === 'approved')  return '<span class="badge bg-success badge-status">已通過</span>'
-  if (s === 'rejected')  return '<span class="badge bg-danger  badge-status">已退回</span>'
-  if (s === 'cancelled') return '<span class="badge bg-secondary badge-status">已取消</span>'
-  if (s === 'pending')   return '<span class="badge bg-warning text-dark badge-status">審核中</span>'
-  return `<span class="badge bg-dark">${s}</span>`
-}
-function place(p = {}) { return [p.city, p.district].filter(Boolean).join(' ') }
-function animalLine(p = {}) { return [p.species, p.breed, p.sex, p.age, p.bodyType].filter(Boolean).join('｜') }
-function firstImg(p = {}) { return p.image1 || p.image2 || p.image3 || fallback }
-function dt(s) { return s ? new Date(s).toLocaleString('zh-TW', { hour12: false }) : '' }
+// ===== 資料 =====
+const loading = ref(false)
+const items = ref([])
+const page = reactive({ number: 0, totalPages: 0, totalElements: 0 })
+
+const resultText = computed(() => {
+  if (loading.value) return '讀取中…'
+  if (!page.totalPages) return `共 ${items.value.length} 筆`
+  return `共 ${page.totalElements} 筆，第 ${page.number + 1}/${page.totalPages} 頁`
+})
+
+const fallback = '/images/no-image.jpg'
+const firstImg = (p) => p?.image1 || p?.image2 || p?.image3 || fallback
+const place = (p) => [p?.city, p?.district].filter(Boolean).join(' ')
+const animalLine = (p) => [p?.species, p?.breed, p?.sex, p?.age, p?.bodyType].filter(Boolean).join('｜')
+const dt = (s) => s ? new Date(s).toLocaleString('zh-TW', { hour12: false }) : ''
+
+const badge = (s) => ({
+  approved: '<span class="badge bg-success fw-semibold">已通過</span>',
+  rejected: '<span class="badge bg-danger  fw-semibold">已退回</span>',
+  cancelled: '<span class="badge bg-secondary fw-semibold">已取消</span>',
+  pending:  '<span class="badge bg-warning text-dark fw-semibold">審核中</span>'
+}[s] || `<span class="badge bg-dark">${s}</span>`)
 
 async function load() {
-  if (!user.userId) {
-    router.replace({ name: 'login', query: { redirect: route.fullPath } })
-    return
-  }
   loading.value = true
   try {
-    const params = { page: state.page, size: state.size }
-    if (state.status && state.status !== 'all') params.status = state.status
-
-    const r = await axios.get('/api/my/applications', { params })
-    const data = r.data || {}
-
-    items.value = Array.isArray(data.content) ? data.content : (Array.isArray(data) ? data : [])
-    const totalPages = data.totalPages ?? 0
-    pageMax.value = totalPages ? totalPages - 1 : 0
-    if (data.totalElements != null) {
-      pageInfo.value = `共 ${data.totalElements} 筆，第 ${data.number + 1}/${data.totalPages} 頁`
-    } else {
-      pageInfo.value = `共 ${items.value.length} 筆`
-    }
-  } catch {
+    const p = new URLSearchParams()
+    p.set('page', state.page); p.set('size', state.size)
+    if (state.status && state.status!=='all') p.set('status', state.status)
+    const r = await fetch(`/api/my/applications?${p}`, { credentials: 'include' })
+    if (!r.ok) throw new Error(await r.text())
+    const data = await r.json()
+    // 兼容 array / spring 分頁
+    items.value = Array.isArray(data) ? data : (data.content || [])
+    page.number = data.number ?? 0
+    page.totalPages = data.totalPages ?? 0
+    page.totalElements = data.totalElements ?? items.value.length
+  } catch (e) {
+    console.error(e)
     items.value = []
-    pageInfo.value = '讀取失敗'
+    page.number = 0; page.totalPages = 0; page.totalElements = 0
   } finally {
     loading.value = false
   }
 }
 
-async function cancelApply(id) {
+function go(n){
+  if (n<0 || (page.totalPages && n>=page.totalPages)) return
+  state.page = n
+  syncUrl(true)
+  load()
+}
+
+async function cancelApply(id){
   if (!confirm('確定要取消這筆申請？')) return
-  const ok = await axios.patch(`/api/applications/${id}/cancel`)
-    .then(r => r.status >= 200 && r.status < 300).catch(() => false)
+  const ok = await fetch(`/api/applications/${id}/cancel`, { method:'PATCH', credentials:'include' }).then(r=>r.ok)
   alert(ok ? '已取消' : '取消失敗')
   if (ok) load()
 }
 
-onMounted(load)
-watch(() => route.query, () => {
-  state.page = +(route.query.page || 0)
-  state.status = route.query.status || 'pending'
+onMounted(async () => {
+  await getAuth()
+  syncUrl()
   load()
 })
 </script>
 
 <style scoped>
-.thumb-box { width: 100%; height: 220px; background: #f8f9fa; border-radius: .5rem; overflow: hidden; }
-.bg-contain { background-repeat: no-repeat; background-position: center; background-size: contain; }
+/* ==== 膠囊 segmented：讓它看起來是一顆 ==== */
+.tabs-pills{
+  display:inline-flex;
+  border:1px solid #d2b48c;
+  border-radius:999px;
+  overflow:hidden;
+  background:#d19f72;         /* 品牌底色 */
+}
+.tabs-pills .btn{
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  padding:.55rem 1.25rem;
+  line-height:1;
+  color:#fff;
+  background:transparent;
+  font-weight:700;
+}
+.tabs-pills .btn + .btn{
+  position:relative;
+}
+.tabs-pills .btn + .btn::before{
+  content:"";
+  position:absolute; left:0; top:0; bottom:0; width:1px;
+  background: rgba(255,255,255,.35);   /* 中間分隔線 */
+}
+/* 啟用狀態（右半變深色、或視需要自行調） */
+.tabs-pills .btn.active{ background:#6b7680; }
 
-#tabs-cross .btn.active,
-#tabs-status .btn.active { background: #cfa178; color: #fff; border-color: #cfa178; }
+/* 迷你尺寸（右上狀態過濾／分頁） */
+.tabs-small{ border-radius:30px; }
+.tabs-small .btn{ padding:.4rem .9rem; font-weight:600; }
 
-.card .stretched-link::after { z-index: 1; }
-.action-area { position: relative; z-index: 2; }
-.badge-status { font-weight: 600; }
+/* 縮圖區（跟舊版對齊） */
+.thumb-box{ width:100%; height:220px; background:#f8f9fa; border-radius:.5rem; overflow:hidden; }
+.bg-contain{ background-repeat:no-repeat; background-position:center; background-size:contain; }
+
+/* 讓卡片內按鈕在 stretched-link 之上點得到 */
+.card .stretched-link::after{ z-index:1; }
+.action-area{ position:relative; z-index:2; }
 </style>

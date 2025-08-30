@@ -1,5 +1,5 @@
 <template>
-  <main class="container py-4">
+  <main class="adopt-view-page container py-4">
     <h2 class="text-center mb-3">🐾 領養認養詳情</h2>
 
     <!-- 載入/錯誤 -->
@@ -351,5 +351,93 @@ watch(() => route.query.id, load)
 
 @media (max-width:576px) {
   .carousel-fitbox { height: 300px; }
+}
+
+#petCarousel {
+  border-radius: .5rem;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+.carousel-fitbox {
+  height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+}
+.carousel-fitbox img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+.sex-icon { display: inline-flex; align-items: center; line-height: 1; }
+.sex-icon img { height: 18px; width: auto !important; margin-left: .25rem; vertical-align: -2px; display: inline-block; }
+@media (max-width:576px) { .carousel-fitbox { height: 300px; } }
+
+/* === 新增：本頁的品牌按鈕樣式（不影響別頁） === */
+.adopt-view-page .btn {
+  padding: 6px 16px;
+  border-radius: 30px;     /* 膠囊圓角 */
+  font-weight: 600;
+}
+
+/* 主要行動（例如：我要領養 / 前往 / 查看） */
+.adopt-view-page .btn-outline-secondary {
+  background-color: #d19f72; /* 品牌色 */
+  color: #fff;
+  border: none;
+}
+.adopt-view-page .btn-outline-secondary:hover {
+  background-color: #b9845e;
+  color: #fff;
+}
+
+/* 取消申請：保留警示語意但套上同圓角/粗度 */
+.adopt-view-page .btn-outline-danger {
+  border-width: 2px;
+  border-radius: 30px;
+}
+
+/* 擁有者控制：暫停 / 關閉 / 恢復 → 走品牌系家族 */
+.adopt-view-page .btn-outline-warning { /* 暫停 */
+  background-color: #f8f2e9;
+  color: #d19f72;
+  border: none;
+}
+.adopt-view-page .btn-outline-warning:hover {
+  background-color: #d19f72;
+  color: #fff;
+}
+
+.adopt-view-page .btn-outline-success { /* 恢復 */
+  background-color: #e9f6ef;
+  color: #5b7f6e;
+  border: none;
+}
+.adopt-view-page .btn-outline-success:hover {
+  background-color: #5b7f6e;
+  color: #fff;
+}
+
+/* 分隔：申請區的 textarea 與按鈕對齊好看一點（可留可拿掉） */
+.adopt-view-page textarea.form-control {
+  border-radius: 12px;
+}
+
+/* alert 也做點和諧（可留可拿掉） */
+.adopt-view-page .alert-info {
+  border: none;
+  background: #f0f6ff;
+}
+.adopt-view-page .alert-success {
+  border: none;
+  background: #dff3e7;
+}
+.adopt-view-page .alert-warning {
+  border: none;
+  background: #fff4e5;
 }
 </style>
