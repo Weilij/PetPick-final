@@ -25,6 +25,10 @@ const RegisterSuccess = () => import('../pages/Auth/RegisterSuccess.vue')
 const Commodity = () => import('../pages/Shop/Commodity.vue')
 const ProductSite = () => import('../pages/Shop/ProductSite.vue')
 const cart = () => import('@/pages/Shop/cart.vue')
+const Checkout = () => import('@/pages/Shop/Checkout.vue')
+const Success = () => import('@/pages/Shop/Success.vue')
+const Order = () => import('@/pages/Shop/Order.vue')
+const OrderDetail = () => import('@/pages/Shop/OrderDetail.vue')
 //Account
 
 
@@ -61,7 +65,10 @@ const router = createRouter({
     { path: '/commodity', name: 'commodity', component: Commodity },
     { path: '/product/:id', name: 'productSite', component: ProductSite, props: true },
     { path: '/cart', name: 'cart', component: cart },
-
+    { path: '/checkout', name: 'checkout', component: Checkout },
+    { path: '/success', name: 'success', component: Success },
+    { path: '/order', name: 'order', component: Order },
+    { path: '/orderDetail', name: 'orderDetail', component: OrderDetail },
     //Account
     { path: '/login', name: 'login', component: () => import('@/pages/Auth/Login.vue') },
 

@@ -9,15 +9,8 @@
       </RouterLink>
 
       <!-- 手機切換按鈕（Bootstrap 5 要用 data-bs-*） -->
-      <button
-        class="navbar-toggler"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#navbarNav"
-        aria-controls="navbarNav"
-        aria-expanded="false"
-        aria-label="Toggle navigation"
-      >
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
 
@@ -42,13 +35,8 @@
           <div class="d-flex align-items-center gap-1 ms-lg-auto">
 
             <!-- Chat（含未讀切換：normal vs unread） -->
-            <RouterLink
-              id="chatBubbleBtn"
-              class="btn btn-material position-relative"
-              to="/chat"
-              aria-label="聊天室"
-              title="聊天室"
-            >
+            <RouterLink id="chatBubbleBtn" class="btn btn-material position-relative" to="/chat" aria-label="聊天室"
+              title="聊天室">
               <span id="chatBubbleBadge" class="material-icons">chat_bubble_outline</span>
               <span id="chatBubbleBadge-unread" class="material-icons d-none">mark_chat_unread</span>
             </RouterLink>
@@ -56,33 +44,36 @@
             <!-- Cart -->
             <RouterLink class="btn btn-material position-relative" to="/cart" aria-label="購物車" title="購物車">
               <span class="material-icons">shopping_cart</span>
-              <span
-                v-if="cart.itemsCount > 0"
-                class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill"
-                style="min-width:20px;"
-              >{{ cart.itemsCount }}</span>
+              <span v-if="cart.itemsCount > 0"
+                class="badge bg-danger position-absolute top-0 start-200 translate-middle rounded-pill"
+                style="min-width: 20px;">
+                {{ cart.itemsCount }}
+              </span>
             </RouterLink>
 
             <!-- 帳號 -->
             <div class="dropdown d-inline-block">
-              <button
-                class="btn btn-material d-flex align-items-center gap-1"
-                type="button"
-                id="accountMenuBtn"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                aria-label="帳號選單"
-              >
+              <button class="btn btn-material d-flex align-items-center gap-1" type="button" id="accountMenuBtn"
+                data-bs-toggle="dropdown" aria-expanded="false" aria-label="帳號選單">
                 <span class="material-icons">account_circle</span>
                 <span class="d-none d-sm-inline text-muted small" v-if="user.isLoggedIn">Hi, {{ user.username }}</span>
               </button>
 
               <!-- 已登入選單 -->
-              <ul v-if="user.isLoggedIn" class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="accountMenuBtn">
-                <li><RouterLink class="dropdown-item" to="/profile">我的資料</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/orders">我的訂單</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/missions/my">我的任務</RouterLink></li>
-                <li><hr class="dropdown-divider" /></li>
+              <ul v-if="user.isLoggedIn" class="dropdown-menu dropdown-menu-end shadow"
+                aria-labelledby="accountMenuBtn">
+                <li>
+                  <RouterLink class="dropdown-item" to="/profile">我的資料</RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/orders">我的訂單</RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/missions/my">我的任務</RouterLink>
+                </li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
                 <li><button class="dropdown-item text-danger" @click="logout">登出</button></li>
               </ul>
 
@@ -93,7 +84,9 @@
                     登入
                   </RouterLink>
                 </li>
-                <li><RouterLink class="dropdown-item" to="/register">註冊</RouterLink></li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/register">註冊</RouterLink>
+                </li>
               </ul>
             </div>
           </div>
@@ -120,7 +113,7 @@ const router = useRouter()
 let disposeRealtime = null
 let realtimeStarted = false
 
-function startRealtimeIfReady () {
+function startRealtimeIfReady() {
   if (realtimeStarted) return
   if (!user.userId) return
   if (typeof Realtime?.init !== 'function') return
@@ -161,10 +154,10 @@ onUnmounted(() => {
   realtimeStarted = false
 })
 
-async function logout () {
+async function logout() {
   try {
     await axios.post('/logout')
-  } catch {}
+  } catch { }
   user.clearUser()
   // 清未讀圖示
   const unread = document.querySelector('#chatBubbleBadge-unread')
@@ -181,20 +174,25 @@ async function logout () {
 
 <style scoped>
 /* 針對右上角 icon 的微調，避免點擊範圍過小 */
-.btn.btn-material { padding: 8px 10px; }
-.navbar-brand { letter-spacing: .3px; }
+.btn.btn-material {
+  padding: 8px 10px;
+}
+
+.navbar-brand {
+  letter-spacing: .3px;
+}
 
 .btn-login {
-    background-color: #d19f72;
-    border-radius: 30px;
-    padding: 6px 16px;
-    font-weight: bold;
-    border: none;
-    transition: 0.3s;
+  background-color: #d19f72;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-weight: bold;
+  border: none;
+  transition: 0.3s;
 }
 
 .btn-login:hover {
-    background-color: #b9845e;
-    color: #4e4e4e;
+  background-color: #b9845e;
+  color: #4e4e4e;
 }
 </style>

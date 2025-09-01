@@ -52,6 +52,7 @@
 </template>
 
 <script setup>
+import * as bootstrap from 'bootstrap'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import http from '@/utils/http'
 import { useCartStore } from '@/stores/cart'
@@ -140,7 +141,7 @@ function toast(message, type = 'success') {
   const containerId = 'toastContainer'
   let container = document.getElementById(containerId)
   if (!container) {
-    const html = `<div id="${containerId}" class="toast-container position-fixed top-0 end-0 p-3" style="z-index:2000;"></div>`
+    const html = `<div id="${containerId}" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:2000;"></div>`
     document.body.insertAdjacentHTML('beforeend', html)
     container = document.getElementById(containerId)
   }

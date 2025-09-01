@@ -4,16 +4,22 @@ import http from '@/utils/http'
 
 export const useCartStore = defineStore('cart', {
   state: () => ({
-    items: [],       // 後端回來的購物車清單
-    userId: null,    // 可由 user store 或呼叫 refresh 時傳入
+    items: [],
+    userId: null,
     loading: false,
   }),
   getters: {
-    itemsCount: (s) => s.items.length,                                    // 品項數（行數）
-    quantityTotal: (s) => s.items.reduce((sum, it) => sum + (+it.quantity || 0), 0), // 數量總和（非徽章）
+    itemsCount: (s) => s.items.length,
+    quantityTotal: (s) => s.items.reduce((sum, it) => sum + (+it.quantity || 0), 0),
     amountTotal: (s) => s.items.reduce((sum, it) => sum + (+it.price || 0) * (+it.quantity || 0), 0),
   },
   actions: {
+    reset() {
+      // 登出時清空徽章 / 狀態
+      this.items = []
+      this.userId = null
+      this.loading = false
+    },
     async refresh(uid) {
       if (!uid) return
       this.loading = true
@@ -28,12 +34,10 @@ export const useCartStore = defineStore('cart', {
         this.loading = false
       }
     },
-    // 供加入購物車後更新徽章
     async add(userId, productId, quantity = 1) {
       await http.post('/api/cart/add', { userId, productId, quantity })
-      await this.refresh(userId)
+      await this.refresh(userId) // 方案B：操作後立刻從 server 拉一次
     },
-    // 供刪除/清空後更新徽章
     async removeItem(cartId) {
       await http.delete(`/api/cart/item/${cartId}`)
       await this.refresh(this.userId)

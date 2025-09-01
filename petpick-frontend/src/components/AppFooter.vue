@@ -1,6 +1,6 @@
 <template>
   <!-- Footer -->
-  <footer class="footer pt-5">
+  <footer class="footer pt-5 mt-3">
     <div class="container">
       <div class="row">
         <!-- 左邊：聯絡資訊 -->
