@@ -1,6 +1,11 @@
 <template>
   <header class="mb-3">
-    <img :src="headerImg" alt="header" class="w-100 d-block" />
+    <!-- 修正 header 圖片 -->
+    <img 
+      :src="headerImg" 
+      alt="header" 
+      class="w-100 d-block"
+      @error="($event) => $event.target.src = fallbackImg" />
   </header>
 
   <div class="container py-4">
@@ -9,7 +14,7 @@
       <input v-model.trim="keyword" type="text" class="form-control w-50 mx-auto" placeholder="搜尋商品名稱或描述..." />
     </div>
 
-    <!-- 篩選 / 排序（包含：全部 / 熱門 / 最新 / 後端 type 動態分類） -->
+    <!-- 篩選 / 排序 -->
     <div class="d-flex justify-content-center mb-4 align-items-center flex-wrap gap-2">
       <input type="radio" class="btn-check" name="productFilter" id="btn-all" value="all" v-model="currentType" />
       <label class="btn btn-filter mx-2" for="btn-all">全部商品</label>
@@ -27,229 +32,468 @@
       </select>
     </div>
 
-    <!-- 清單 -->
-    <div v-if="loading" class="text-center text-muted py-5">載入商品中…</div>
-    <div v-else-if="viewList.length === 0" class="text-center text-muted py-5">目前沒有可顯示的商品</div>
-    <div v-else class="row g-3">
-      <div v-for="p in viewList" :key="p.productId ?? p.id" class="col-6 col-md-3 col-lg-2">
-        <TaskCardLikeProduct
-  :image="p?.imageUrl ?? fallbackImg"
-  :title="String(p?.pname ?? p?.name ?? '無標題')"
-  :desc="String(p?.description ?? '')"
-  :price="Number(p?.price ?? 0)"
-  @add="() => addToCart(p?.productId ?? p?.id, 1)"
-:detailLink="{ name: 'ProductSite', params: { id: String(p?.productId ?? p?.id ?? '') } }"
-/>
+    <!-- 除錯資訊 -->
+    <div class="mb-3 p-3 bg-light rounded">
+      <div class="text-muted mb-2">
+        <strong>除錯資訊：</strong>
+      </div>
+      <div class="small">
+        <div>allProducts: {{ allProducts.length }} 筆</div>
+        <div>viewList: {{ viewList.length }} 筆</div>
+        <div>currentType: {{ currentType }}</div>
+        <div>keyword: "{{ keyword }}"</div>
+        <div>sortOrder: {{ sortOrder }}</div>
+        <div>loading: {{ loading }}</div>
+        
+        <!-- ✅ 顯示登入狀態 -->
+        <div class="mt-2 p-2 bg-white rounded border">
+          <div class="fw-bold text-info mb-1">用戶狀態：</div>
+          <div>登入狀態: {{ auth.isLoggedIn ? '已登入' : '未登入' }}</div>
+          <div v-if="auth.isLoggedIn">用戶 ID: {{ auth.userId }}</div>
+          <div v-if="auth.isLoggedIn">用戶角色: {{ auth.role }}</div>
+        </div>
+        
+        <!-- 顯示篩選結果統計 -->
+        <div class="mt-2 p-2 bg-white rounded border">
+          <div class="fw-bold text-primary mb-1">篩選統計：</div>
+          <div>全部商品: {{ allProducts.filter(p => pickActive(p)).length }} 筆</div>
+          <div>熱門商品: {{ getFilteredCount('popular') }} 筆</div>
+          <div>最新商品: {{ getFilteredCount('newest') }} 筆</div>
+        </div>
+      </div>
+      
+      <!-- 顯示商品範例 -->
+      <details class="mt-2">
+        <summary class="text-muted">查看商品範例</summary>
+        <div class="small mt-2 bg-white p-2 border rounded">
+          <div v-if="allProducts.length > 0" class="mb-2">
+            <strong>第一個商品的欄位：</strong>
+            <pre>{{ JSON.stringify(allProducts[0], null, 2) }}</pre>
+          </div>
+          <div v-if="viewList.length > 0">
+            <strong>目前顯示的第一個商品：</strong>
+            <pre>{{ JSON.stringify(viewList[0], null, 2) }}</pre>
+          </div>
+        </div>
+      </details>
+    </div>
 
-        />
-        <TaskCardLikeProduct :image="p.imageUrl || fallbackImg" :title="p.pname || p.name" :desc="p.description"
-          :price="p.price" @add="() => addToCart(p.productId ?? p.id, 1)"
-          :detailLink="{ name: 'productSite', params: { id: String(p.productId ?? p.id) } }" />
+    <!-- 清單 -->
+    <div v-if="loading" class="text-center text-muted py-5">
+      <div class="spinner-border" role="status">
+        <span class="visually-hidden">載入中...</span>
+      </div>
+      <div class="mt-2">載入商品中…</div>
+    </div>
+    
+    <div v-else-if="allProducts.length === 0" class="text-center text-muted py-5">
+      <div class="alert alert-warning">
+        <h5>沒有找到商品資料</h5>
+        <p>API 可能沒有回傳資料或資料格式不正確</p>
+      </div>
+    </div>
+    
+    <div v-else-if="viewList.length === 0" class="text-center text-muted py-5">
+      <div class="alert alert-info">
+        <h5>沒有符合條件的商品</h5>
+        <p>總商品數：{{ allProducts.length }} 筆</p>
+        <p>請調整搜尋條件或篩選設定</p>
+      </div>
+    </div>
+    
+    <!-- 商品列表 -->
+    <div v-else class="row g-3">
+      <div v-for="(p, index) in viewList" :key="`product-${p.productId || p.id || index}`" class="col-6 col-md-4 col-lg-3">
+        <div class="card h-100 shadow-sm">
+          <!-- 修正圖片載入 -->
+          <img 
+            :src="p.imageUrl || fallbackImg" 
+            :alt="p.pname || p.name || '商品圖片'" 
+            class="card-img-top"
+            style="height: 200px; object-fit: cover;"
+            @error="(event) => handleImageError(event, p)"
+            loading="lazy">
+          
+          <div class="card-body d-flex flex-column">
+            <h6 class="card-title">{{ p.pname || p.name || '無標題' }}</h6>
+            <p class="card-text text-muted small flex-grow-1">
+              {{ p.description || '暫無描述' }}
+            </p>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <strong class="text-primary">NT$ {{ Number(p.price || 0) }}</strong>
+              
+              <!-- ✅ 修正按鈕狀態和文字 -->
+              <button 
+                class="btn btn-sm"
+                :class="auth.isLoggedIn ? 'btn-outline-primary' : 'btn-outline-secondary'"
+                @click="addToCart(p.productId || p.id, 1)"
+                :disabled="!p.productId && !p.id">
+                {{ auth.isLoggedIn ? '加入購物車' : '請先登入' }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 置頂 -->
-    <button id="backToTop" class="btn btn-primary shadow" v-show="showBackToTop" @click="scrollToTop">↑</button>
+    <!-- 置頂按鈕 -->
+    <button 
+      id="backToTop" 
+      class="btn btn-primary shadow" 
+      v-show="showBackToTop" 
+      @click="scrollToTop"
+      style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
+      ↑
+    </button>
   </div>
 </template>
 
 <script setup>
-import * as bootstrap from 'bootstrap'
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import http from '@/utils/http'
 import { useCartStore } from '@/stores/cart'
-import TaskCardLikeProduct from '@/components/TaskCardLikeProduct.vue'
-import headerImg from '@/assets/shop/headerImg.jpeg'
+import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
+// import headerImg from '@/assets/shop/headerImg.jpeg'
 
-const fallbackImg = 'https://i.ibb.co/7d1QYqY2/image-50dp-000000-FILL0-wght400-GRAD0-opsz48.png'
+const router = useRouter()
+const userStore = useUserStore()
+const cartStore = useCartStore()
 
+// 修正 fallback 圖片網址，使用更可靠的來源
+const fallbackImg = '/images/no-image.jpg'
+
+// 檢查 headerImg 是否存在
+let headerImg
+try {
+  headerImg = new URL('@/assets/shop/headerImg.jpeg', import.meta.url).href
+} catch (e) {
+  console.warn('Header image not found, using fallback')
+  headerImg = fallbackImg
+}
+
+// 響應式資料
 const allProducts = ref([])
 const keyword = ref('')
-
-// ✅ 和 UI 綁定的狀態
-//   - all / popular / newest：固定三種
-//   - 其餘值：視為「資料庫 type」做分類
 const currentType = ref('all')
-const sortOrder = ref('default')  // default | asc | desc
-
+const sortOrder = ref('default')
 const showBackToTop = ref(false)
 const loading = ref(true)
 
-// TODO：接上登入後改為 user store
-const userId = 1
-const cartStore = useCartStore()
+// ✅ 使用 store 的認證狀態和用戶 ID
+const auth = computed(() => ({
+  isLoggedIn: userStore.isLogin,
+  userId: userStore.userId,
+  role: userStore.role
+}))
 
-/** 從商品物件萃取類別（以 Product.type 為主，並相容其他命名） */
-function normalizeType(p) {
-  // 常見：type / typeCode + typeName
-  if (p?.typeCode) return { value: String(p.typeCode), label: p.typeName || p.type || String(p.typeCode) }
-  if (p?.type) return { value: String(p.type), label: String(p.type) }
-
-  // 其他命名：category / categoryCode / categoryName
-  if (p?.categoryCode || p?.category || p?.categoryName) {
-    const value = String(p.categoryCode ?? p.category ?? '')
-    const label = String(p.categoryName ?? p.category ?? value)
-    return value ? { value, label } : null
-  }
-
-  // ✅ 你的 Entity 有 categoryId，但可能沒 type；也納入當作分類值
-  if (p?.categoryId != null) {
-    const value = String(p.categoryId)
-    // 這裡沒有名稱就用 value；未來若後端回傳 categoryName 再放進來
-    return { value, label: value }
-  }
-
-  return null
-}
-
-/** 僅顯示上架中：active===true、published!==false、且 status 無「下架/停售」等 */
+// 檢查商品是否為活躍狀態
 function pickActive(p) {
-  // 布林欄位
-  if (typeof p?.active === 'boolean' && !p.active) return false
-  if (typeof p?.published === 'boolean' && p.published === false) return false
-
-  // 其他常見旗標
-  const flag = (p?.active ?? p?.is_active ?? p?.statusFlag ?? '')
-    .toString().trim().toUpperCase()
-  if (['0', 'N', 'FALSE'].includes(flag)) return false
-
-  // status 字串（後端若有）
-  const st = (p?.status ?? '').toString()
-  if (st && /下架|停售|INACTIVE|OFF|DISABLE/i.test(st)) return false
-
+  // 如果有 active 欄位且為 false，則不顯示
+  if (p?.active === false) return false
+  // 如果有 published 欄位且為 false，則不顯示
+  if (p?.published === false) return false
+  // 其他情況都視為活躍
   return true
 }
 
-/** 可用的「後端類別」清單（若要在畫面上動態產生分類用得到） */
-const categories = computed(() => {
-  const map = new Map()
-  for (const p of allProducts.value || []) {
-    const t = normalizeType(p)
-    if (!t) continue
-    const key = (t.value ?? '').trim()
-    if (!key) continue
-    if (!map.has(key)) map.set(key, (t.label ?? key).trim())
-  }
-  return Array.from(map, ([value, label]) => ({ value, label }))
-})
-
-/** 顯示清單（依 currentType / keyword / sortOrder） */
+// 計算顯示的商品列表（簡化版）
 const viewList = computed(() => {
-  let list = (allProducts.value || [])
+  console.log('🔍 計算 viewList:', {
+    allProducts: allProducts.value?.length || 0,
+    currentType: currentType.value,
+    keyword: keyword.value,
+    sortOrder: sortOrder.value
+  })
+  
+  let result = (allProducts.value || [])
     .filter(p => pickActive(p))
     .filter(p => {
-      const productType = p.type ?? 'all' // ✅ 預設 null 為 all
-      const typeOk =
-        currentType.value === 'all' || productType === currentType.value
-
-      const name = (p.pname ?? p.name ?? '').toString()
-      const desc = (p.description ?? '').toString()
-      const kw = keyword.value.trim().toLowerCase()
-      const kwOk =
-        !kw ||
-        name.toLowerCase().includes(kw) ||
-        desc.toLowerCase().includes(kw)
-
-      return typeOk && kwOk
+      if (currentType.value === 'all') return true
+      
+      // 簡化的熱門商品邏輯：價格 > 500 或商品 ID 為偶數
+      if (currentType.value === 'popular') {
+        const price = Number(p.price || 0)
+        const id = Number(p.productId || p.id || 0)
+        return price > 500 || id % 2 === 0
+      }
+      
+      // 簡化的最新商品邏輯：商品 ID 較大的一半
+      if (currentType.value === 'newest') {
+        const allIds = allProducts.value.map(item => Number(item.productId || item.id || 0))
+        const maxId = Math.max(...allIds)
+        const minId = Math.min(...allIds)
+        const threshold = minId + (maxId - minId) * 0.5
+        const currentId = Number(p.productId || p.id || 0)
+        return currentId >= threshold
+      }
+      
+      return true
     })
-
-  if (sortOrder.value === 'asc') list = list.slice().sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
-  let list = (allProducts.value || []).filter(p => pickActive(p))
-
-  // 關鍵字
-  const kw = keyword.value.trim().toLowerCase()
-  if (kw) {
-    list = list.filter(p => {
-      const name = (p.pname ?? p.name ?? '').toString().toLowerCase()
-      const desc = (p.description ?? '').toString().toLowerCase()
+    .filter(p => {
+      const kw = keyword.value.trim().toLowerCase()
+      if (!kw) return true
+      
+      const name = String(p.pname || p.name || '').toLowerCase()
+      const desc = String(p.description || '').toLowerCase()
+      
       return name.includes(kw) || desc.includes(kw)
     })
+
+  // 排序
+  if (sortOrder.value === 'asc') {
+    result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
+  } else if (sortOrder.value === 'desc') {
+    result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0))
   }
 
-  // 篩選（用 DB 欄位 type：popular/newest）
-  const cur = String(currentType.value || '').toLowerCase()
-  if (cur !== 'all') {
-    list = list.filter(p => String(p.type || '').toLowerCase() === cur)
-  }
-
-  // 排序（價格）
-  if (sortOrder.value === 'asc')  list = list.slice().sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
-  if (sortOrder.value === 'desc') list = list.slice().sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
-
-  return list
+  console.log('✅ viewList 計算完成:', {
+    total: result.length,
+    filter: currentType.value,
+    sampleProduct: result[0] ? {
+      id: result[0].productId || result[0].id,
+      name: result[0].pname || result[0].name,
+      price: result[0].price
+    } : null
+  })
+  
+  return result
 })
 
-
+// 載入商品資料
 async function loadProducts() {
   loading.value = true
   try {
-    const res = await http.get('/api/products', { params: { active: true } })
-    const raw = res?.data
-    const arr = Array.isArray(raw)
-      ? raw
-      : (Array.isArray(raw?.content) ? raw.content
-        : Array.isArray(raw?.list) ? raw.list
-          : Array.isArray(raw?.items) ? raw.items
-            : [])
-    allProducts.value = arr
-  } catch (e) {
-    console.error('讀取商品失敗:', e)
-    toast('讀取商品失敗，請稍後再試', 'danger')
+    console.log('🚀 開始載入商品...')
+    const response = await http.get('/api/products', { 
+      params: { active: true } 
+    })
+    
+    console.log('📦 API 完整回應:', response)
+    console.log('📦 API 資料:', response.data)
+    
+    let products = []
+    
+    // 處理不同的資料格式
+    if (Array.isArray(response.data)) {
+      products = response.data
+    } else if (response.data && typeof response.data === 'object') {
+      // 可能的巢狀結構
+      if (Array.isArray(response.data.content)) {
+        products = response.data.content
+      } else if (Array.isArray(response.data.data)) {
+        products = response.data.data
+      } else if (Array.isArray(response.data.items)) {
+        products = response.data.items
+      } else if (Array.isArray(response.data.products)) {
+        products = response.data.products
+      } else {
+        console.warn('⚠️ 未知的資料格式:', response.data)
+        products = []
+      }
+    }
+    
+    // 處理商品圖片網址
+    products = products.map(p => ({
+      ...p,
+      imageUrl: validateImageUrl(p.imageUrl) ? p.imageUrl : fallbackImg
+    }))
+    
+    allProducts.value = products
+    console.log('✅ 商品載入完成:', products.length, '筆')
+    console.log('📝 商品範例:', products.slice(0, 2))
+    
+  } catch (error) {
+    console.error('💥 載入商品失敗:', error)
     allProducts.value = []
+    
+    // 顯示錯誤提示
+    if (error.response) {
+      console.error('HTTP 錯誤:', error.response.status, error.response.data)
+    }
   } finally {
     loading.value = false
   }
 }
 
-async function addToCart(productId, quantity = 1) {
+// 驗證圖片網址是否有效
+function validateImageUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  
+  // 檢查是否為有效的 URL 格式
   try {
-    await cartStore.add(userId, Number(productId), Math.max(1, Number(quantity) || 1))
-    toast('✅ 已加入購物車')
-  } catch (e) {
-    console.error(e)
-    toast('❌ 加入失敗，請稍後再試', 'danger')
+    new URL(url)
+    return true
+  } catch {
+    // 如果不是完整 URL，檢查是否為相對路徑
+    return url.startsWith('/') || url.startsWith('./') || url.startsWith('../')
   }
 }
 
+// 處理圖片載入錯誤
+function handleImageError(event, product) {
+  console.warn('圖片載入失敗:', product.imageUrl, '商品:', product.pname || product.name)
+  event.target.src = fallbackImg
+}
+
+// ✅ 修正加入購物車功能 - 需要登入驗證
+async function addToCart(productId, quantity = 1) {
+  // 檢查是否登入
+  if (!auth.value.isLoggedIn) {
+    console.warn('⚠️ 用戶未登入，導向登入頁面')
+    
+    if (confirm('請先登入才能加入購物車，是否前往登入頁面？')) {
+      // 保存當前頁面路徑，登入後返回
+      const currentPath = router.currentRoute.value.fullPath
+      router.push({ 
+        name: 'login', 
+        query: { redirect: currentPath } 
+      })
+    }
+    return
+  }
+
+  // 檢查用戶 ID
+  if (!auth.value.userId) {
+    console.error('❌ 用戶 ID 無效:', auth.value.userId)
+    alert('❌ 用戶資訊異常，請重新登入')
+    return
+  }
+
+  // 檢查商品 ID
+  if (!productId) {
+    console.error('❌ 商品 ID 無效:', productId)
+    alert('❌ 商品資訊異常')
+    return
+  }
+  
+  try {
+    console.log('🚀 加入購物車:', {
+      userId: auth.value.userId,
+      productId: productId,
+      quantity: quantity
+    })
+    
+    await cartStore.add(
+      auth.value.userId, 
+      Number(productId), 
+      Math.max(1, Number(quantity) || 1)
+    )
+    
+    console.log('✅ 已加入購物車:', productId)
+    showToast('✅ 商品已加入購物車！', 'success')
+    
+  } catch (error) {
+    console.error('❌ 加入購物車失敗:', error)
+    
+    if (error.response?.status === 401) {
+      alert('❌ 登入狀態已過期，請重新登入')
+      router.push({ name: 'login' })
+    } else if (error.response?.status === 400) {
+      showToast('❌ 商品資訊有誤，請稍後再試', 'danger')
+    } else {
+      showToast('❌ 加入購物車失敗，請稍後再試', 'danger')
+    }
+  }
+}
+
+// 顯示提示訊息
+function showToast(message, type = 'success') {
+  // 簡單的提示實作
+  const toast = document.createElement('div')
+  toast.className = `alert alert-${type} position-fixed`
+  toast.style.cssText = `
+    top: 20px; 
+    right: 20px; 
+    z-index: 9999; 
+    min-width: 300px;
+    animation: slideIn 0.3s ease-out;
+  `
+  toast.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
+  `
+  
+  document.body.appendChild(toast)
+  
+  // 3 秒後自動移除
+  setTimeout(() => {
+    if (toast.parentElement) {
+      toast.remove()
+    }
+  }, 3000)
+}
+
+// 添加篩選統計函數
+function getFilteredCount(filterType) {
+  const activeProducts = allProducts.value.filter(p => pickActive(p))
+  
+  if (filterType === 'popular') {
+    return activeProducts.filter(p => {
+      const price = Number(p.price || 0)
+      const id = Number(p.productId || p.id || 0)
+      return price > 500 || id % 2 === 0
+    }).length
+  }
+  
+  if (filterType === 'newest') {
+    const allIds = allProducts.value.map(item => Number(item.productId || item.id || 0))
+    const maxId = Math.max(...allIds)
+    const minId = Math.min(...allIds)
+    const threshold = minId + (maxId - minId) * 0.5
+    
+    return activeProducts.filter(p => {
+      const currentId = Number(p.productId || p.id || 0)
+      return currentId >= threshold
+    }).length
+  }
+  
+  return 0
+}
+
+// 滾動相關
 function onScroll() {
-  // 置頂鈕顯示控制
   showBackToTop.value = window.scrollY > 200
 }
+
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function toast(message, type = 'success') {
-  const id = 't' + Math.random().toString(36).slice(2)
-  const containerId = 'toastContainer'
-  let container = document.getElementById(containerId)
-  if (!container) {
-    const html = `<div id="${containerId}" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:2000;"></div>`
-    document.body.insertAdjacentHTML('beforeend', html)
-    container = document.getElementById(containerId)
-  }
-  container.insertAdjacentHTML('beforeend', `
-    <div id="${id}" class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-      </div>
-    </div>`)
-  const el = document.getElementById(id)
-  new bootstrap.Toast(el, { delay: 2200 }).show()
-  el.addEventListener('hidden.bs.toast', () => el.remove())
-}
+// 監聽資料變化（用於除錯）
+watch(allProducts, (newVal) => {
+  console.log('📊 allProducts 更新:', newVal?.length || 0, '筆')
+}, { deep: true })
 
+watch(viewList, (newVal) => {
+  console.log('📊 viewList 更新:', newVal?.length || 0, '筆')
+})
+
+// 生命週期
 onMounted(async () => {
+  console.log('🎬 Commodity 組件載入')
+  console.log('👤 當前用戶狀態:', auth.value)
+  
   await loadProducts()
-  await cartStore.refresh(userId)
-
-  // 初次進場先判斷一次
-  onScroll()
+  
+  // 如果用戶已登入，刷新購物車
+  if (auth.value.isLoggedIn && auth.value.userId) {
+    try {
+      await cartStore.refresh(auth.value.userId)
+      console.log('✅ 購物車資料已刷新')
+    } catch (error) {
+      console.warn('⚠️ 購物車刷新失敗:', error)
+    }
+  }
+  
   window.addEventListener('scroll', onScroll)
 })
-onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+})
 </script>
+
 <style scoped>
 .btn-filter {
   background-color: #d19f72;
@@ -270,33 +514,15 @@ input[type="radio"].btn-check:checked+.btn-filter {
   color: #fff;
 }
 
-.card img {
-  height: 200px;
-  object-fit: cover;
-}
-
-/* 右下角置頂 */
-#backToTop {
-  position: fixed;
-  bottom: 40px;
-  right: 30px;
-  width: 50px;
-  height: 50px;
-  background-color: #d19f72;
-  color: #fff;
-  border: 0;
-  border-radius: 50%;
-  font-size: 20px;
-  display: none;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, .2);
-  z-index: 999;
-  cursor: pointer;
-  transition: opacity .3s ease-in-out;
-}
-
-#backToTop:hover {
-  background-color: #b9845e;
+/* ✅ 新增 Toast 動畫 */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>

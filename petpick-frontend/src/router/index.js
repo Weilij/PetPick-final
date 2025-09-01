@@ -24,7 +24,7 @@ const RegisterSuccess = () => import('../pages/Auth/RegisterSuccess.vue')
 //Shop
 const Commodity = () => import('../pages/Shop/Commodity.vue')
 const ProductSite = () => import('../pages/Shop/ProductSite.vue')
-const cart = () => import('@/pages/Shop/cart.vue')
+const cart = () => import('@/pages/Shop/Cart.vue')
 const Checkout = () => import('@/pages/Shop/Checkout.vue')
 const Success = () => import('@/pages/Shop/Success.vue')
 const Order = () => import('@/pages/Shop/Order.vue')

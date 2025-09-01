@@ -155,13 +155,66 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Modal, Toast } from 'bootstrap'
-import { useRouter } from 'vue-router' // ★ 新增：用來跳轉 success 頁
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
-// ====== 常數/狀態 ======
-const DEMO_UID = 1
-const DEMO_HEADERS = { 'X-Demo-UserId': String(DEMO_UID) }
+// ✅ 修正 getUserId 函數，正確讀取 localStorage
+const getUserId = () => {
+  // 1. 優先從 userStore 取得
+  if (userStore.userId) {
+    console.log('🆔 從 userStore 取得 userId:', userStore.userId)
+    return userStore.userId
+  }
+  
+  // 2. 從 sessionStorage 取得
+  const sessionUserId = sessionStorage.getItem('checkout_user_id')
+  if (sessionUserId) {
+    console.log('🆔 從 sessionStorage 取得 userId:', sessionUserId)
+    return Number(sessionUserId)
+  }
+  
+  // 3. 從 localStorage auth 物件取得
+  try {
+    const authData = localStorage.getItem('auth')
+    if (authData) {
+      const auth = JSON.parse(authData)
+      if (auth.userid) {
+        console.log('🆔 從 localStorage auth 取得 userId:', auth.userid)
+        return Number(auth.userid)
+      }
+    }
+  } catch (error) {
+    console.error('❌ 解析 localStorage auth 失敗:', error)
+  }
+  
+  // 4. 都沒有的話，記錄錯誤並返回 null
+  console.error('❌ 無法取得 userId，請檢查登入狀態')
+  return null
+}
+
+// ✅ 修正檢查登入狀態函數
+const checkAuth = () => {
+  const userId = getUserId()
+  
+  if (!userStore.isLogin && !userId) {
+    console.warn('⚠️ 用戶未登入且無 userId，導向登入頁面')
+    router.push({ name: 'login' })
+    return false
+  }
+  
+  if (!userId) {
+    console.warn('⚠️ 無法取得 userId，導向登入頁面')
+    router.push({ name: 'login' })
+    return false
+  }
+  
+  console.log('✅ 認證檢查通過，userId:', userId)
+  return true
+}
 
 const submitting = ref(false)
 const total = ref(0)
@@ -210,6 +263,7 @@ function isValidReceiverName(n) {
   const hasCJK = /[\u4E00-\u9FFF]/.test(clean)
   return hasCJK ? (clean.length >= 2 && clean.length <= 5) : (clean.length >= 4 && clean.length <= 10)
 }
+
 function showToast(message, type = 'primary') {
   const el = document.createElement('div')
   el.className = `toast align-items-center text-bg-${type} border-0 position-fixed top-0 end-0 m-3`
@@ -227,6 +281,7 @@ function showToast(message, type = 'primary') {
   inst.show()
   el.addEventListener('hidden.bs.toast', () => el.remove())
 }
+
 function safeText(x) { return x == null ? '' : String(x) }
 function updateStoreInfo() { }
 
@@ -252,78 +307,132 @@ function submitEcpayFormFromHtml(html) {
   document.body.appendChild(form)
   form.submit()
 }
+
+// ✅ 修正：使用 http instance 而不是原生 fetch
 async function postForHtmlForm(url, payload) {
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...DEMO_HEADERS },
-    credentials: 'include',
-    body: JSON.stringify(payload || {})
-  })
-  const text = await resp.text()
-  if (!resp.ok) {
-    try { const j = JSON.parse(text); throw new Error(j.message || j.error || text) }
-    catch { throw new Error(text || `HTTP ${resp.status}`) }
+  try {
+    console.log(`📤 POST HTML Form: ${url}`, payload)
+    
+    const response = await http.post(url, payload || {}, {
+      responseType: 'text' // ✅ 期望回傳 HTML 文字而不是 JSON
+    })
+    
+    const text = response.data
+    
+    if (!/<form[\s>]/i.test(text)) {
+      throw new Error('伺服器未回傳第三方支付表單')
+    }
+    
+    console.log('✅ 收到第三方支付表單')
+    return text
+    
+  } catch (error) {
+    console.error('❌ postForHtmlForm 錯誤:', error)
+    
+    if (error.response?.status === 401) {
+      userStore.logout()
+      router.push({ name: 'login' })
+      throw new Error('認證失效，請重新登入')
+    }
+    
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        error.message || 
+                        '取得支付表單失敗'
+    
+    throw new Error(errorMessage)
   }
-  if (!/<form[\s>]/i.test(text)) throw new Error('伺服器未回傳第三方支付表單')
-  return text
 }
+
+// ✅ 修正：使用 http instance 而不是原生 fetch
 async function postJson(url, body) {
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...DEMO_HEADERS },
-    credentials: 'include',
-    body: JSON.stringify(body || {})
-  })
-  const text = await resp.text()
-  let data = {}
-  try { data = text ? JSON.parse(text) : {} } catch { data = { raw: text } }
-  if (!resp.ok) {
-    const msg = data.message || data.error || text || `HTTP ${resp.status}`
-    throw new Error(msg)
+  try {
+    console.log(`📤 POST JSON: ${url}`, body)
+    
+    const response = await http.post(url, body || {})
+    
+    console.log('✅ API 回應成功:', response.data)
+    return response.data
+    
+  } catch (error) {
+    console.error('❌ postJson 錯誤:', error)
+    
+    if (error.response?.status === 401) {
+      userStore.logout()
+      router.push({ name: 'login' })
+      throw new Error('認證失效，請重新登入')
+    }
+    
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        error.message || 
+                        '請求失敗'
+    
+    throw new Error(errorMessage)
   }
-  return data
 }
+
+// ✅ 修正：使用 http instance
 async function markOrderFailed(orderId, reason) {
   if (!orderId) return false
+  
   try {
-    const r1 = await fetch(`/api/orders/${encodeURIComponent(orderId)}/fail`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...DEMO_HEADERS },
-      credentials: 'include',
-      body: JSON.stringify({ reason: reason || '' })
-    })
-    if (r1.ok) return true
-  } catch { }
-  try {
-    const r2 = await fetch(`/api/orders/${encodeURIComponent(orderId)}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...DEMO_HEADERS },
-      credentials: 'include',
-      body: JSON.stringify({ status: 'Failed', note: reason || '' })
-    })
-    return r2.ok
-  } catch { return false }
+    console.log(`🚫 標記訂單失敗: ${orderId}`, reason)
+    
+    // 嘗試第一個 API
+    try {
+      await http.post(`/api/orders/${encodeURIComponent(orderId)}/fail`, {
+        reason: reason || ''
+      })
+      console.log('✅ 訂單已標記為失敗')
+      return true
+    } catch (e1) {
+      console.warn('⚠️ 第一個失敗 API 無效，嘗試第二個')
+      
+      // 嘗試第二個 API
+      await http.patch(`/api/orders/${encodeURIComponent(orderId)}/status`, {
+        status: 'Failed',
+        note: reason || ''
+      })
+      console.log('✅ 訂單狀態已更新為失敗')
+      return true
+    }
+  } catch (error) {
+    console.error('❌ 標記訂單失敗時發生錯誤:', error)
+    return false
+  }
 }
+
+// ✅ 修正：使用 http instance
 async function clearCartOnLocalPayment(uid) {
   try {
-    await fetch(`/api/cart/clear/${encodeURIComponent(uid)}`, {
-      method: 'DELETE',
-      headers: { ...DEMO_HEADERS },
-      credentials: 'include'
-    })
-  } catch { }
+    console.log(`🛒 清空購物車: userId=${uid}`)
+    
+    await http.delete(`/api/cart/clear/${encodeURIComponent(uid)}`)
+    
+    console.log('✅ 購物車已清空')
+  } catch (error) {
+    console.error('❌ 清空購物車失敗:', error)
+  }
 }
+
+// ✅ 修正：使用 http instance
 async function refreshCartBadge(uid) {
   try {
-    const r = await fetch(`/api/cart/withProduct/${encodeURIComponent(uid)}`, {
-      headers: { ...DEMO_HEADERS },
-      credentials: 'include'
-    })
-    const items = r.ok ? await r.json() : []
-    const count = Array.isArray(items) ? items.length : 0
+    console.log(`🔄 刷新購物車徽章: userId=${uid}`)
+    
+    const response = await http.get(`/api/cart/withProduct/${encodeURIComponent(uid)}`)
+    const items = Array.isArray(response.data) ? response.data : []
+    const count = items.length
+    
     const badgeEl = document.getElementById('cart-badge')
-    if (badgeEl) badgeEl.textContent = String(count)
-  } catch { }
+    if (badgeEl) {
+      badgeEl.textContent = String(count)
+      console.log(`✅ 購物車徽章已更新: ${count}`)
+    }
+  } catch (error) {
+    console.error('❌ 刷新購物車徽章失敗:', error)
+  }
 }
 
 // ====== 事件處理 ======
@@ -336,16 +445,25 @@ function onDeliveryChange() {
   const effectivePayment = deliveryMethod.value === 'cvs_cod' ? 'cod' : (payment.value || '').toLowerCase()
   sessionStorage.setItem('last_payment', effectivePayment)
 }
+
 function onPhoneInput() {
   phone.value = phone.value.replace(/\D+/g, '').slice(0, 10)
 }
+
 function showFail(message) {
   failMessage.value = message || '付款 / 建單流程發生錯誤，請稍後再試。'
   failModalInst?.show()
 }
 
 async function handleSubmit() {
-  if (submitting.value || !canSubmit.value) return
+  if (!checkAuth() || submitting.value || !canSubmit.value) return
+  
+  const userId = getUserId()
+  if (!userId) {
+    showFail('無法取得用戶資訊，請重新登入')
+    return
+  }
+  
   submitting.value = true
   let createdOrderId = null
 
@@ -365,6 +483,16 @@ async function handleSubmit() {
       if (_zip && !/^\d{3,5}$/.test(_zip)) throw new Error('郵遞區號格式不正確')
     }
 
+    console.log('🛒 開始結帳流程:', {
+      userId: userId, // ✅ 加入 userId 日誌
+      name: _name,
+      phone: _phone,
+      delivery: _delivery,
+      payment: _payment,
+      address: _addr,
+      zip: _zip
+    })
+
     // 1) 建立訂單
     const order = await postJson('/api/orders/checkout', {
       addr: _addr,
@@ -373,13 +501,17 @@ async function handleSubmit() {
       receiverPhone: _phone,
       shippingType: _delivery
     })
+    
     const orderId = order?.orderId
     if (!orderId) throw new Error('訂單建立失敗（缺少 orderId）')
     createdOrderId = orderId
+    
+    console.log('✅ 訂單建立成功:', orderId)
 
     // 2) 分流
     if (_delivery === 'cvs_cod') {
       // 超商取貨付款 → 前往選店
+      console.log('🏪 超商取貨付款流程')
       const html = await postForHtmlForm('/api/logistics/cvs/map', {
         orderId,
         subType: cvsBrand.value || 'FAMIC2C',
@@ -391,13 +523,18 @@ async function handleSubmit() {
 
     if (_delivery === 'address' && _payment === 'credit') {
       // 宅配 + 信用卡 → 前往金流
-      const html = await postForHtmlForm('/api/pay/ecpay/checkout', { orderId, origin: window.location.origin })
+      console.log('💳 宅配 + 信用卡付款流程')
+      const html = await postForHtmlForm('/api/pay/ecpay/checkout', { 
+        orderId, 
+        origin: window.location.origin 
+      })
       submitEcpayFormFromHtml(html)
       return
     }
 
     if (_delivery === 'address' && _payment === 'cod') {
       // 宅配 + 貨到付款 → 建立宅配託運單，然後跳 success 頁
+      console.log('🚚 宅配 + 貨到付款流程')
       try {
         const j = await postJson('/api/logistics/home/ecpay/create', {
           orderId,
@@ -407,27 +544,27 @@ async function handleSubmit() {
           receiverAddr: _addr,
           isCollection: true
         })
-        // 可選：提示一下（不阻塞跳轉）
         showToast(`已建立宅配託運單：${j.trackingNo || j.logisticsId || '已送出'}`, 'success')
       } catch (e) {
         await markOrderFailed(createdOrderId, e.message)
         showFail(`宅配建單失敗：${e.message}`)
         return
       }
-      // 清空購物車徽章（依需求保留）
-      const uid = Number(sessionStorage.getItem('checkout_user_id')) || 1
-      await clearCartOnLocalPayment(uid)
-      await refreshCartBadge(uid)
+      
+      // ✅ 使用取得的 userId
+      await clearCartOnLocalPayment(userId)
+      await refreshCartBadge(userId)
 
-      // ★ 改成跳轉 success 頁（請依你的路由調整 path 或 name）
       router.push({ path: '/success', query: { orderId: String(orderId) } })
       return
     }
 
     // 理論上不會進到；保底直接當成功頁跳轉
     router.push({ path: '/checkout/success', query: { orderId: String(createdOrderId) } })
+    
   } catch (err) {
-    console.error(err)
+    console.error('❌ 結帳流程錯誤:', err)
+    
     if (createdOrderId) {
       await markOrderFailed(createdOrderId, err?.message || 'Checkout Error')
       showFail(err?.message || '付款 / 建單流程發生錯誤，請稍後再試。')
@@ -441,6 +578,20 @@ async function handleSubmit() {
 
 // ====== 初始載入合計 / 初始化 modal & 事件 ======
 onMounted(async () => {
+  console.log('🎬 Checkout 組件載入')
+  
+  // 檢查登入狀態和 userId
+  if (!checkAuth()) return
+  
+  const userId = getUserId()
+  console.log('👤 當前用戶 ID:', userId)
+  
+  if (!userId) {
+    console.error('❌ 無法取得 userId，無法載入購物車資料')
+    router.push({ name: 'login' })
+    return
+  }
+
   // Modal 實例
   if (tncModalRef.value) {
     tncModalInst = Modal.getOrCreateInstance(tncModalRef.value)
@@ -448,26 +599,40 @@ onMounted(async () => {
   }
   if (failModalRef.value) failModalInst = Modal.getOrCreateInstance(failModalRef.value)
 
-  // 初次配送處理（同步 payment）
   onDeliveryChange()
 
-  // 初始合計 & 徽章
-  const userId = Number(sessionStorage.getItem('checkout_user_id')) || 1
+  // ✅ 載入購物車資料
   try {
-    const res = await fetch(`/api/cart/withProduct/${encodeURIComponent(userId)}`, {
-      headers: { ...DEMO_HEADERS }, credentials: 'include'
-    })
-    const items = res.ok ? await res.json() : []
-    total.value = (Array.isArray(items) ? items : []).reduce(
+    const response = await http.get(`/api/cart/withProduct/${encodeURIComponent(userId)}`)
+    const items = Array.isArray(response.data) ? response.data : []
+    
+    total.value = items.reduce(
       (sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0
     )
+    
+    console.log(`💰 購物車總金額: NT$ ${total.value}`)
+    console.log(`📦 購物車商品數: ${items.length}`)
+    
     const badgeEl = document.getElementById('cart-badge')
-    if (badgeEl) badgeEl.textContent = String((Array.isArray(items) ? items.length : 0))
-  } catch { total.value = 0 }
+    if (badgeEl) {
+      badgeEl.textContent = String(items.length)
+    }
+  } catch (error) {
+    console.error('❌ 載入購物車資料失敗:', error)
+    total.value = 0
+    
+    if (error.response?.status === 401) {
+      userStore.logout()
+      router.push({ name: 'login' })
+    }
+  }
 
   window.addEventListener('scroll', onScroll)
 })
-onBeforeUnmount(() => { window.removeEventListener('scroll', onScroll) })
+
+onBeforeUnmount(() => { 
+  window.removeEventListener('scroll', onScroll) 
+})
 </script>
 
 <style scoped>
