@@ -13,18 +13,8 @@
         <!-- 手機 -->
         <div class="mb-3">
           <label for="phone" class="form-label">收件人手機電話</label>
-          <input
-            v-model="phone"
-            @input="onPhoneInput"
-            type="tel"
-            class="form-control"
-            id="phone"
-            inputmode="numeric"
-            autocomplete="tel"
-            pattern="^09[0-9]{8}$"
-            maxlength="10"
-            required
-          />
+          <input v-model="phone" @input="onPhoneInput" type="tel" class="form-control" id="phone" inputmode="numeric"
+            autocomplete="tel" pattern="^09[0-9]{8}$" maxlength="10" required />
           <div v-show="phoneInvalid" id="phone-error" class="text-danger mt-1">
             請輸入正確手機號碼（09 開頭，共 10 碼）
           </div>
@@ -69,17 +59,19 @@
         <!-- 宅配欄位（address 顯示） -->
         <div class="mb-3" id="zip-field" v-show="deliveryMethod === 'address'">
           <label for="receiver-zip" class="form-label">郵遞區號</label>
-          <input v-model.trim="receiverZip" type="text" class="form-control" id="receiver-zip" inputmode="numeric" maxlength="5" />
+          <input v-model.trim="receiverZip" type="text" class="form-control" id="receiver-zip" inputmode="numeric"
+            maxlength="5" />
         </div>
         <div class="mb-3" id="address-field" v-show="deliveryMethod === 'address'">
           <label for="address" class="form-label">收件地址</label>
-          <input v-model.trim="address" type="text" class="form-control" id="address" :required="deliveryMethod==='address'" />
+          <input v-model.trim="address" type="text" class="form-control" id="address"
+            :required="deliveryMethod === 'address'" />
         </div>
 
         <!-- 付款方式 -->
         <div class="mb-3">
           <label for="payment" class="form-label">付款方式</label>
-          <select v-model="payment" class="form-select" id="payment" :disabled="deliveryMethod==='cvs_cod'">
+          <select v-model="payment" class="form-select" id="payment" :disabled="deliveryMethod === 'cvs_cod'">
             <option value="credit">信用卡</option>
             <option value="cod" id="cod-option">貨到付款</option>
           </select>
@@ -112,19 +104,6 @@
       </form>
     </div>
 
-    <!-- 成功 Modal -->
-    <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutModalLabel" aria-hidden="true" ref="successModalRef">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title" id="checkoutModalLabel">結帳成功！</h5></div>
-          <div class="modal-body">感謝您的訂購！訂單已建立。</div>
-          <div class="modal-footer">
-            <RouterLink to="/orders" class="btn btn-primary">查看訂單</RouterLink>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 失敗 Modal（動態訊息） -->
     <div class="modal fade" id="checkoutFailModal" tabindex="-1" aria-hidden="true" ref="failModalRef">
       <div class="modal-dialog modal-dialog-centered">
@@ -133,7 +112,9 @@
             <h5 class="modal-title">訂單失敗</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body"><div id="failMessage" class="text-danger fw-semibold">{{ failMessage }}</div></div>
+          <div class="modal-body">
+            <div id="failMessage" class="text-danger fw-semibold">{{ failMessage }}</div>
+          </div>
           <div class="modal-footer">
             <RouterLink to="/cart" class="btn btn-outline-secondary">回購物車</RouterLink>
             <button type="button" class="btn btn-danger" data-bs-dismiss="modal">關閉</button>
@@ -143,7 +124,8 @@
     </div>
 
     <!-- 🧾 購買須知 Modal -->
-    <div class="modal fade" id="tncModal" tabindex="-1" aria-labelledby="tncModalLabel" aria-hidden="true" ref="tncModalRef">
+    <div class="modal fade" id="tncModal" tabindex="-1" aria-labelledby="tncModalLabel" aria-hidden="true"
+      ref="tncModalRef">
       <div class="modal-dialog modal-dialog-scrollable modal-lg">
         <div class="modal-content">
           <div class="modal-header">
@@ -173,9 +155,12 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Modal, Toast } from 'bootstrap'
+import { useRouter } from 'vue-router' // ★ 新增：用來跳轉 success 頁
+
+const router = useRouter()
 
 // ====== 常數/狀態 ======
-const DEMO_UID = 1                        // 後端用 Header 模擬登入
+const DEMO_UID = 1
 const DEMO_HEADERS = { 'X-Demo-UserId': String(DEMO_UID) }
 
 const submitting = ref(false)
@@ -185,11 +170,11 @@ const failMessage = ref('')
 // 表單欄位
 const name = ref('')
 const phone = ref('')
-const deliveryMethod = ref('cvs_cod')     // 'cvs_cod' | 'address'
-const cvsBrand = ref('FAMIC2C')           // 預設全家，與你的 js 一樣
+const deliveryMethod = ref('cvs_cod')
+const cvsBrand = ref('FAMIC2C')
 const receiverZip = ref('')
 const address = ref('')
-const payment = ref('cod')                // cvs_cod → 固定 cod；address → credit/cod
+const payment = ref('cod')
 
 // 條款 gating
 const tncOpened = ref(false)
@@ -197,10 +182,8 @@ const tncAgree = ref(false)
 
 // UI refs / 控制
 const tncModalRef = ref(null)
-const successModalRef = ref(null)
 const failModalRef = ref(null)
 let tncModalInst = null
-let successModalInst = null
 let failModalInst = null
 
 // 置頂
@@ -213,14 +196,10 @@ const phoneInvalid = computed(() => !(phone.value === '' || /^09\d{8}$/.test(pho
 const storeInfoText = computed(() => ({ UNIMARTC2C: '7-ELEVEN', FAMIC2C: '全家', HILIFEC2C: '萊爾富', OKMARTC2C: 'OK' }[cvsBrand.value] || ''))
 const totalDisplay = computed(() => Number(total.value || 0).toLocaleString('zh-Hant-TW'))
 const canSubmit = computed(() => {
-  // 姓名
   const okName = isValidReceiverName(name.value)
-  // 手機
   const okPhone = /^09\d{8}$/.test(phone.value)
-  // 地址
   const okAddr = deliveryMethod.value === 'address' ? (address.value && address.value.length >= 3) : true
   const okZip = deliveryMethod.value === 'address' ? (!receiverZip.value || /^\d{3,5}$/.test(receiverZip.value)) : true
-  // 條款
   return okName && okPhone && okAddr && okZip && tncOpened.value && tncAgree.value
 })
 
@@ -249,7 +228,7 @@ function showToast(message, type = 'primary') {
   el.addEventListener('hidden.bs.toast', () => el.remove())
 }
 function safeText(x) { return x == null ? '' : String(x) }
-function updateStoreInfo() { /* 綁 v-model 已自動更新，保留以相容舊行為 */ }
+function updateStoreInfo() { }
 
 // 解析第三方回來的 HTML 生成同等 form 並自動提交
 function submitEcpayFormFromHtml(html) {
@@ -314,7 +293,7 @@ async function markOrderFailed(orderId, reason) {
       body: JSON.stringify({ reason: reason || '' })
     })
     if (r1.ok) return true
-  } catch {}
+  } catch { }
   try {
     const r2 = await fetch(`/api/orders/${encodeURIComponent(orderId)}/status`, {
       method: 'PATCH',
@@ -332,7 +311,7 @@ async function clearCartOnLocalPayment(uid) {
       headers: { ...DEMO_HEADERS },
       credentials: 'include'
     })
-  } catch {}
+  } catch { }
 }
 async function refreshCartBadge(uid) {
   try {
@@ -342,10 +321,9 @@ async function refreshCartBadge(uid) {
     })
     const items = r.ok ? await r.json() : []
     const count = Array.isArray(items) ? items.length : 0
-    // 這裡若有全域 Navbar 元件的 Pinia，可改為呼叫 cartStore.refresh(uid)
     const badgeEl = document.getElementById('cart-badge')
     if (badgeEl) badgeEl.textContent = String(count)
-  } catch {}
+  } catch { }
 }
 
 // ====== 事件處理 ======
@@ -401,7 +379,7 @@ async function handleSubmit() {
 
     // 2) 分流
     if (_delivery === 'cvs_cod') {
-      // 超商取貨付款 → 先選店（這裡沿用原 js 的「固定全家」測試邏輯）
+      // 超商取貨付款 → 前往選店
       const html = await postForHtmlForm('/api/logistics/cvs/map', {
         orderId,
         subType: cvsBrand.value || 'FAMIC2C',
@@ -412,17 +390,14 @@ async function handleSubmit() {
     }
 
     if (_delivery === 'address' && _payment === 'credit') {
-      // 宅配 + 信用卡 → 綠界金流
-      const html = await postForHtmlForm('/api/pay/ecpay/checkout', {
-        orderId,
-        origin: window.location.origin
-      })
+      // 宅配 + 信用卡 → 前往金流
+      const html = await postForHtmlForm('/api/pay/ecpay/checkout', { orderId, origin: window.location.origin })
       submitEcpayFormFromHtml(html)
       return
     }
 
     if (_delivery === 'address' && _payment === 'cod') {
-      // 宅配 + 貨到付款 → 建立宅配託運單
+      // 宅配 + 貨到付款 → 建立宅配託運單，然後跳 success 頁
       try {
         const j = await postJson('/api/logistics/home/ecpay/create', {
           orderId,
@@ -432,22 +407,25 @@ async function handleSubmit() {
           receiverAddr: _addr,
           isCollection: true
         })
+        // 可選：提示一下（不阻塞跳轉）
         showToast(`已建立宅配託運單：${j.trackingNo || j.logisticsId || '已送出'}`, 'success')
       } catch (e) {
         await markOrderFailed(createdOrderId, e.message)
         showFail(`宅配建單失敗：${e.message}`)
         return
       }
-      // 清空徽章（視後端而定）
+      // 清空購物車徽章（依需求保留）
       const uid = Number(sessionStorage.getItem('checkout_user_id')) || 1
       await clearCartOnLocalPayment(uid)
       await refreshCartBadge(uid)
-      successModalInst?.show()
+
+      // ★ 改成跳轉 success 頁（請依你的路由調整 path 或 name）
+      router.push({ path: '/success', query: { orderId: String(orderId) } })
       return
     }
 
-    // 理論上不會進到
-    successModalInst?.show()
+    // 理論上不會進到；保底直接當成功頁跳轉
+    router.push({ path: '/checkout/success', query: { orderId: String(createdOrderId) } })
   } catch (err) {
     console.error(err)
     if (createdOrderId) {
@@ -466,44 +444,36 @@ onMounted(async () => {
   // Modal 實例
   if (tncModalRef.value) {
     tncModalInst = Modal.getOrCreateInstance(tncModalRef.value)
-    // 有打開過
-    tncModalRef.value.addEventListener('shown.bs.modal', () => { /* 僅紀錄已看過 */ })
-    // 關閉後才開放勾選
     tncModalRef.value.addEventListener('hidden.bs.modal', () => { tncOpened.value = true })
   }
-  if (successModalRef.value) successModalInst = Modal.getOrCreateInstance(successModalRef.value)
   if (failModalRef.value) failModalInst = Modal.getOrCreateInstance(failModalRef.value)
 
-  // 初次配送處理（同步 payment 選項與 session）
+  // 初次配送處理（同步 payment）
   onDeliveryChange()
 
   // 初始合計 & 徽章
   const userId = Number(sessionStorage.getItem('checkout_user_id')) || 1
   try {
     const res = await fetch(`/api/cart/withProduct/${encodeURIComponent(userId)}`, {
-      headers: { ...DEMO_HEADERS },
-      credentials: 'include'
+      headers: { ...DEMO_HEADERS }, credentials: 'include'
     })
     const items = res.ok ? await res.json() : []
     total.value = (Array.isArray(items) ? items : []).reduce(
-      (sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 0),
-      0
+      (sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0
     )
     const badgeEl = document.getElementById('cart-badge')
     if (badgeEl) badgeEl.textContent = String((Array.isArray(items) ? items.length : 0))
-  } catch {
-    total.value = 0
-  }
+  } catch { total.value = 0 }
 
   window.addEventListener('scroll', onScroll)
 })
-onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onScroll)
-})
+onBeforeUnmount(() => { window.removeEventListener('scroll', onScroll) })
 </script>
 
 <style scoped>
-.form-custom { max-width: 720px; }
+.form-custom {
+  max-width: 720px;
+}
 
 /* 右下角置頂按鈕 */
 #backToTop {
@@ -526,5 +496,8 @@ onBeforeUnmount(() => {
   font-weight: 500;
   transition: background-color .3s ease;
 }
-.btn-custom:hover { background-color: #b9845e; }
+
+.btn-custom:hover {
+  background-color: #b9845e;
+}
 </style>
