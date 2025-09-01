@@ -13,6 +13,10 @@ app.use(createPinia())
 app.use(router)
 
 import { useUserStore } from '@/stores/user'
+
+
 useUserStore().load()
+
+
 
 app.mount('#app')

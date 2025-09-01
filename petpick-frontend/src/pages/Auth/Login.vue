@@ -91,42 +91,41 @@ onMounted(() => {
 
 // 修改 Login.vue 中的 onSubmit 函數
 async function onSubmit() {
+  if (loading.value) return
   loading.value = true
   errorMessage.value = ''
 
   try {
-    // 確保使用正確的路徑
     const loginRes = await axios.post('/api/auth/login', {
       accountemail: form.username,
       password: form.password
     })
 
-    if (!loginRes.data.success) {
-      errorMessage.value = loginRes.data.message || '登入失敗'
-      loading.value = false
+    if (!loginRes.data?.success) {
+      errorMessage.value = loginRes.data?.message || '登入失敗'
       return
     }
 
-    // 儲存 JWT token
     const token = loginRes.data.token
     localStorage.setItem('jwt_token', token)
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`
 
-    // 取得使用者狀態 - 注意這裡也要用正確路徑
-    const { data: status } = await axios.get('/api/auth/me') // 改用您定義的端點
+    // 拿目前登入者資訊
+    const { data: status } = await axios.get('/api/auth/me')
 
-    // 設定 pinia user 狀態
+    // 更新 Pinia（或改用 await user.load()）
     user.setUser({
       userId: status.userId || '',
       username: status.username || '',
-      token: token
+      token
     })
 
-    // 導回原本頁面或首頁
-    const redirect = route.query.redirect || '/'
-    router.replace(String(redirect))
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    router.replace(redirect)
   } catch (err) {
-    console.error('Login error:', err) // 加入除錯訊息
+    console.error('Login error:', err)
     errorMessage.value = err?.response?.data?.message || '登入失敗，請再試一次'
+    form.password = ''
   } finally {
     loading.value = false
   }

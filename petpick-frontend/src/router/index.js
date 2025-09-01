@@ -91,12 +91,12 @@ const router = createRouter({
   ],
 })
 
-// 🔒 全域守衛：需要登入的頁面會被導到登入頁
-// router.beforeEach((to) => {
-//   const user = useUserStore()
-//   if (to.meta.requiresAuth && !user.isLogin) {
-//     return { name: 'login', query: { redirect: to.fullPath } }
-//   }
-// })
+//🔒 全域守衛：需要登入的頁面會被導到登入頁
+router.beforeEach((to) => {
+  const user = useUserStore()
+  if (to.meta.requiresAuth && !user.isLogin) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+})
 
 export default router
