@@ -1,4 +1,3 @@
-// src/stores/cart.js
 import { defineStore } from 'pinia'
 import http from '@/utils/http'
 

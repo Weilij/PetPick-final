@@ -66,29 +66,32 @@
             </template>
             
             <div class="dropdown d-inline-block">
-              <button class="btn btn-material d-flex align-items-center gap-1" type="button" id="accountMenuBtn"
-                data-bs-toggle="dropdown" aria-expanded="false" aria-label="帳號選單">
-                <span class="material-icons">account_circle</span>
-                <span class="d-none d-sm-inline text-muted small" v-if="user.isLogin">Hi, {{ user.username }}</span>
+              <button
+                v-if="user.isLogin"
+                ref="accountBtnRef"
+                class="btn btn-material d-flex align-items-center gap-1"
+                type="button"
+                aria-label="帳號選單"
+                data-bs-toggle="dropdown"
+              >
+                <span class="d-none d-sm-inline text-muted small">Hi, {{ user.username }}</span>
               </button>
+              <RouterLink
+                v-else
+                class="btn btn-material d-flex align-items-center gap-1"
+                to="/login"
+                aria-label="登入"
+                title="登入"
+              >
+                <span class="material-icons">account_circle</span>
+              </RouterLink>
 
-              <ul v-if="user.isLogin" class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="accountMenuBtn">
+              <ul v-show="user.isLogin" class="dropdown-menu dropdown-menu-end shadow">
                 <li><RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink></li>
                 <li><RouterLink class="dropdown-item" to="/shop/commodity">我的訂單</RouterLink></li>
                 <li><RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink></li>
                 <li><hr class="dropdown-divider" /></li>
                 <li><button class="dropdown-item text-danger" @click="logout">登出</button></li>
-              </ul>
-
-              <ul v-else class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="accountMenuBtn">
-                <li>
-                  <RouterLink class="dropdown-item" :to="{ name: 'login', query: { redirect: route.fullPath } }">
-                    登入
-                  </RouterLink>
-                </li>
-                <li>
-                  <RouterLink class="dropdown-item" to="/register">註冊</RouterLink>
-                </li>
               </ul>
             </div>
           </div>
@@ -99,17 +102,20 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
-// import Realtime from '@/common/realtime'
 import axios from '@/utils/http'
+import { Dropdown } from 'bootstrap'
 
 const user = useUserStore()
 const cart = useCartStore()
 const route = useRoute()
 const router = useRouter()
+
+const accountBtnRef = ref(null)
+let dd = null
 
 let disposeRealtime = null
 let realtimeStarted = false
@@ -131,14 +137,14 @@ function startRealtimeIfReady() {
 onMounted(() => {
   user.load() // <--- 修正處：在這裡呼叫 load()
   
-  // 啟動聊天未讀監聽（有 userId 時）
-  try {
-  globalThis.startRealtimeIfReady?.()
-} catch (e) {
-  console.warn('realtime init skipped:', e)
-}
   // 掛載時拉一次購物車數量
   if (user.userId) cart.refresh(user.userId)
+
+  nextTick(() => {
+    if (accountBtnRef.value) {
+      dd = Dropdown.getOrCreateInstance(accountBtnRef.value, { autoClose: true })
+    }
+  })
 })
 
 watch(
@@ -155,7 +161,26 @@ watch(
   }
 )
 
+watch(
+  () => user.isLogin,
+  async (loggedIn) => {
+    await nextTick()
+    if (dd) {
+      dd.dispose()
+      dd = null
+    }
+    if (loggedIn && accountBtnRef.value) {
+      dd = Dropdown.getOrCreateInstance(accountBtnRef.value, { autoClose: true })
+    }
+  },
+  { immediate: true }
+)
+
 onUnmounted(() => {
+  if (dd) {
+    dd.dispose()
+    dd = null
+  }
   if (typeof disposeRealtime === 'function') disposeRealtime()
   disposeRealtime = null
   realtimeStarted = false
@@ -167,12 +192,6 @@ async function logout() {
   } catch {}
   user.logout() // <--- 修正處：呼叫 user store 裡的 logout
   
-  // 這些 DOM 操作應該在 store 裡面處理
-  // const unread = document.querySelector('#chatBubbleBadge-unread')
-  // const normal = document.querySelector('#chatBubbleBadge')
-  // unread?.classList.add('d-none')
-  // normal?.classList.remove('d-none')
-
   cart.reset?.()
 
   router.replace({ path: '/login', query: { redirect: route.fullPath } })
