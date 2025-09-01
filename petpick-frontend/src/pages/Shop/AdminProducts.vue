@@ -164,7 +164,8 @@
                             <label class="form-label">圖片連結</label>
                             <input type="url" class="form-control" v-model.trim="form.imageUrl"
                                 placeholder="https://…" />
-                            <div class="form-text">留空則使用預設占位圖。</div>
+                            <a href="https://zh-tw.imgbb.com/" target="_blank">轉檔網站1</a><br>
+                            <a href="https://zh-tw.imgbb.com/" target="_blank">轉檔網站2</a>
                         </div>
                         <div class="mt-2">
                             <img v-if="form.imageUrl" :src="form.imageUrl" class="rounded border" alt="預覽"
