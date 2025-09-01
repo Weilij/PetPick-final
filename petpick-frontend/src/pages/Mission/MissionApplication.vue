@@ -141,14 +141,25 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter, RouterLink } from 'vue-router'
 import http from '@/utils/http'
 import { useUserStore } from '@/stores/user'
 
+const router = useRouter()
+const userStore = useUserStore()
 
-const userStore = useUserStore?.()
-function currentUserId(){ return window.CURRENT_USER_ID ?? userStore?.userId ?? 1 }
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
 
-const fallbackImg = '/assets/default-avatar.png'
+function currentUserId() { 
+  return auth.value.uid || null
+}
+
+const fallbackImg = '/images/no-image.jpg'
 
 // UI 狀態
 const activeTab = ref('all')
@@ -163,25 +174,60 @@ const myApplied = ref([])     // 我申請出去的
 // 展開中的 missionId 集合
 const openSet = ref(new Set())
 
-onMounted(loadAll)
+onMounted(async () => {
+  // 檢查認證狀態
+  if (!auth.value.loggedIn) {
+    error.value = '請先登入才能查看任務控制台'
+    return
+  }
+  
+  await loadAll()
+})
 
 async function loadAll(){
   loading.value = true
   error.value = ''
   const uid = currentUserId()
-  try{
+  
+  if (!uid) {
+    error.value = '無法取得用戶資訊，請重新登入'
+    loading.value = false
+    return
+  }
+  
+  try {
+    console.log('🚀 開始載入任務控制台資料，用戶 ID:', uid)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
     const [m, o, a] = await Promise.all([
       http.get(`/api/owners/${uid}/missions`),
       http.get(`/api/applications/me/owner`, { params: { userId: uid } }),
       http.get(`/api/applications/me/applicant`, { params: { userId: uid } }),
     ])
+    
     allMissions.value = Array.isArray(m.data) ? m.data : []
     ownerApps.value   = Array.isArray(o.data) ? o.data : []
     myApplied.value   = Array.isArray(a.data) ? a.data : []
-  }catch(e){
-    console.error(e)
-    error.value = '載入失敗'
-  }finally{
+    
+    console.log('✅ 任務控制台資料載入完成:', {
+      myMissions: allMissions.value.length,
+      receivedApps: ownerApps.value.length,
+      myApps: myApplied.value.length
+    })
+    
+  } catch(e) {
+    console.error('💥 載入任務控制台失敗:', e)
+    
+    if (e.response?.status === 401) {
+      error.value = '認證已過期，請重新登入'
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else if (e.response?.status === 403) {
+      error.value = '沒有權限查看任務控制台'
+    } else {
+      error.value = e.response?.data?.message || e.message || '載入失敗'
+    }
+  } finally {
     loading.value = false
   }
 }
@@ -194,7 +240,17 @@ const listToRender = computed(() => activeTab.value==='ongoing' ? ongoingMission
 function tagLine(tags){ return Array.isArray(tags) && tags.length ? tags.map(t=>`#${t}`).join(' ') : '無標籤' }
 function toInt(n){ return Number.isFinite(+n) ? +n : 0 }
 function toBool(v){ return String(v)==='true' || v===true || v===1 }
-function fmt(s){ if(!s) return ''; const d = new Date(String(s).replace(' ','T')); const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}` }
+function fmt(s){ 
+  if(!s) return ''
+  try {
+    const d = new Date(String(s).replace(' ','T'))
+    const pad=n=>String(n).padStart(2,'0')
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}` 
+  } catch (err) {
+    console.error('💥 時間格式化失敗:', err, s)
+    return '時間格式錯誤'
+  }
+}
 function onImgErr(e){ e.target.src = fallbackImg }
 function badgeClass(m){ return toBool(m.hasAccepted) ? 'bg-success' : (toInt(m.pendingCount)>0 ? 'bg-warning' : 'bg-secondary') }
 function badgeText(m){ return toBool(m.hasAccepted) ? '已配對' : (toInt(m.pendingCount)>0 ? '待審中' : '未有申請') }
@@ -212,36 +268,99 @@ function appsByMission(mid){ return ownerApps.value.filter(a => String(a.mission
 async function onDeleteMission(mid){
   if(!confirm('確定刪除此任務？此動作無法復原')) return
   const uid = currentUserId()
-  try{
+  
+  if (!uid) {
+    alert('❌ 無法取得用戶資訊')
+    return
+  }
+  
+  try {
+    console.log('🚀 開始刪除任務:', mid)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
     await http.delete(`/api/missions/${mid}`, { params: { posterId: uid } })
+    
     allMissions.value = allMissions.value.filter(x => String(x.missionId) !== String(mid))
     ownerApps.value   = ownerApps.value.filter(x => String(x.missionId) !== String(mid))
-  }catch(e){
-    console.error(e)
-    alert('刪除失敗')
+    
+    console.log('✅ 任務刪除成功')
+    alert('✅ 任務已刪除')
+    
+  } catch(e) {
+    console.error('💥 刪除任務失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else if (e.response?.status === 403) {
+      alert('❌ 沒有權限刪除此任務')
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此任務')
+    } else {
+      alert(`❌ 刪除失敗: ${e.response?.data?.message || e.message}`)
+    }
   }
 }
 
 // 操作：同意/拒絕申請（對應 ownerDecision）
 async function ownerDecision(appId, action, missionId){
-  if(!confirm(action==='accepted' ? '確定同意此申請？' : '確定拒絕此申請？')) return
+  const actionText = action === 'accepted' ? '同意' : '拒絕'
+  if(!confirm(`確定${actionText}此申請？`)) return
+  
   const uid = currentUserId()
-  try{
-    await http.patch(`/api/applications/${appId}/status`, null, { params: { ownerId: uid, status: action } })
+  
+  if (!uid) {
+    alert('❌ 無法取得用戶資訊')
+    return
+  }
+  
+  try {
+    console.log('🚀 開始處理申請:', { appId, action, missionId })
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    await http.patch(`/api/applications/${appId}/status`, null, { 
+      params: { ownerId: uid, status: action } 
+    })
 
     // 更新 ownerApps 狀態
-    ownerApps.value = ownerApps.value.map(a => a.applicationId === +appId ? { ...a, status: action } : a)
+    ownerApps.value = ownerApps.value.map(a => 
+      a.applicationId === +appId ? { ...a, status: action } : a
+    )
 
     if(action === 'accepted'){
       // 標記任務為已配對
-      allMissions.value = allMissions.value.map(m => String(m.missionId) === String(missionId) ? { ...m, hasAccepted: true, pendingCount: 0 } : m)
+      allMissions.value = allMissions.value.map(m => 
+        String(m.missionId) === String(missionId) 
+          ? { ...m, hasAccepted: true, pendingCount: 0 } 
+          : m
+      )
     } else {
       // 拒絕則 pendingCount -1
-      allMissions.value = allMissions.value.map(m => String(m.missionId) === String(missionId) ? { ...m, pendingCount: Math.max(0, toInt(m.pendingCount) - 1) } : m)
+      allMissions.value = allMissions.value.map(m => 
+        String(m.missionId) === String(missionId) 
+          ? { ...m, pendingCount: Math.max(0, toInt(m.pendingCount) - 1) } 
+          : m
+      )
     }
-  }catch(e){
-    console.error(e)
-    alert('操作失敗')
+    
+    console.log('✅ 申請處理成功')
+    alert(`✅ 已${actionText}申請`)
+    
+  } catch(e) {
+    console.error('💥 處理申請失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else if (e.response?.status === 403) {
+      alert('❌ 沒有權限處理此申請')
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此申請')
+    } else {
+      alert(`❌ 操作失敗: ${e.response?.data?.message || e.message}`)
+    }
   }
 }
 
@@ -249,16 +368,53 @@ async function ownerDecision(appId, action, missionId){
 async function onCancel(appId){
   if(!confirm('確定取消這筆申請？')) return
   const uid = currentUserId()
-  try{
-    await http.delete(`/api/applications/${appId}`, { params: { applicantId: uid } })
+  
+  if (!uid) {
+    alert('❌ 無法取得用戶資訊')
+    return
+  }
+  
+  try {
+    console.log('🚀 開始取消申請:', appId)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    await http.delete(`/api/applications/${appId}`, { 
+      params: { applicantId: uid } 
+    })
+    
     myApplied.value = myApplied.value.filter(x => x.applicationId !== appId)
-  }catch(e){
-    console.error(e)
-    alert('取消失敗')
+    
+    console.log('✅ 申請取消成功')
+    alert('✅ 申請已取消')
+    
+  } catch(e) {
+    console.error('💥 取消申請失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else if (e.response?.status === 403) {
+      alert('❌ 沒有權限取消此申請')
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此申請')
+    } else {
+      alert(`❌ 取消失敗: ${e.response?.data?.message || e.message}`)
+    }
   }
 }
 
 // 狀態徽章工具（文字/樣式）
-function statusText(s){ if(s==='accepted')return'同意'; if(s==='pending')return'等待對方回覆'; return'取消' }
-function statusClass(s){ if(s==='accepted')return'bg-success'; if(s==='pending')return'bg-warning'; return'bg-danger' }
+function statusText(s){ 
+  if(s==='accepted') return '同意'
+  if(s==='pending') return '等待對方回覆'
+  if(s==='rejected') return '已拒絕'
+  return '已取消'
+}
+function statusClass(s){ 
+  if(s==='accepted') return 'bg-success'
+  if(s==='pending') return 'bg-warning'
+  if(s==='rejected') return 'bg-danger'
+  return 'bg-secondary'
+}
 </script>

@@ -32,6 +32,16 @@
     <div v-else-if="viewList.length === 0" class="text-center text-muted py-5">目前沒有可顯示的商品</div>
     <div v-else class="row g-3">
       <div v-for="p in viewList" :key="p.productId ?? p.id" class="col-6 col-md-3 col-lg-2">
+        <TaskCardLikeProduct
+  :image="p?.imageUrl ?? fallbackImg"
+  :title="String(p?.pname ?? p?.name ?? '無標題')"
+  :desc="String(p?.description ?? '')"
+  :price="Number(p?.price ?? 0)"
+  @add="() => addToCart(p?.productId ?? p?.id, 1)"
+:detailLink="{ name: 'ProductSite', params: { id: String(p?.productId ?? p?.id ?? '') } }"
+/>
+
+        />
         <TaskCardLikeProduct :image="p.imageUrl || fallbackImg" :title="p.pname || p.name" :desc="p.description"
           :price="p.price" @add="() => addToCart(p.productId ?? p.id, 1)"
           :detailLink="{ name: 'productSite', params: { id: String(p.productId ?? p.id) } }" />
@@ -125,6 +135,25 @@ const categories = computed(() => {
 
 /** 顯示清單（依 currentType / keyword / sortOrder） */
 const viewList = computed(() => {
+  let list = (allProducts.value || [])
+    .filter(p => pickActive(p))
+    .filter(p => {
+      const productType = p.type ?? 'all' // ✅ 預設 null 為 all
+      const typeOk =
+        currentType.value === 'all' || productType === currentType.value
+
+      const name = (p.pname ?? p.name ?? '').toString()
+      const desc = (p.description ?? '').toString()
+      const kw = keyword.value.trim().toLowerCase()
+      const kwOk =
+        !kw ||
+        name.toLowerCase().includes(kw) ||
+        desc.toLowerCase().includes(kw)
+
+      return typeOk && kwOk
+    })
+
+  if (sortOrder.value === 'asc') list = list.slice().sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
   let list = (allProducts.value || []).filter(p => pickActive(p))
 
   // 關鍵字
@@ -149,6 +178,7 @@ const viewList = computed(() => {
 
   return list
 })
+
 
 async function loadProducts() {
   loading.value = true

@@ -256,9 +256,18 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import http from '@/utils/http' // axios（baseURL: '/api'）
+import { useUserStore } from '@/stores/user'
+import http from '@/utils/http'
 
 const router = useRouter()
+const userStore = useUserStore()
+
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
 
 // ===== 狀態 =====
 const step = ref(1)
@@ -307,20 +316,41 @@ async function loadAreas(){
 const filePicker = ref(null)
 const uploadSlot = ref(1)
 function pickAndUpload(slot){ uploadSlot.value = slot; filePicker.value?.click() }
+
 async function doUpload(e){
   const files = Array.from(e.target.files || [])
   if (!files.length) return
+  
   const fd = new FormData()
   files.forEach(f => fd.append('files', f))
+  
   try {
     submitting.value = true
-    const { data } = await http.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' }})
-    const urls = data?.urls || []
+    console.log('🚀 開始上傳圖片到 slot:', uploadSlot.value)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.post('/api/upload', fd, { 
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    const urls = response.data?.urls || []
     if (urls.length){
       form[`image${uploadSlot.value}`] = urls[0]
+      console.log('✅ 上傳成功，URL:', urls[0])
     }
-  } catch (err){
-    alert('上傳失敗')
+  } catch (err) {
+    console.error('💥 上傳失敗:', err)
+    
+    if (err.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (err.response?.status === 413) {
+      alert('❌ 檔案太大，請選擇較小的圖片')
+    } else {
+      alert(`❌ 上傳失敗: ${err.response?.data?.message || err.message}`)
+    }
   } finally {
     e.target.value = ''
     submitting.value = false
@@ -329,13 +359,32 @@ async function doUpload(e){
 
 // ===== 送出 =====
 function asBool(v){ return v === true || v === 'true' }
+
 async function onSubmit(){
   triedSubmit.value = true
-  if (!agree.value) return
+  
+  // 檢查同意條款
+  if (!agree.value) {
+    alert('❌ 請先同意條款與注意事項')
+    return
+  }
+  
+  // 檢查認證狀態
+  if (!auth.value.loggedIn) {
+    alert('❌ 請先登入才能刊登')
+    sessionStorage.setItem('redirect', '/post/adopt')
+    router.push('/login')
+    return
+  }
+  
   // HTML5 required 驗證（簡單保險：檢查幾個必要欄位）
   const requiredOk = ['title','breed','species','sex','bodyType','age','city','district','description','contactName','contactPhone']
     .every(k => String(form[k]||'').trim().length)
-  if (!requiredOk) return
+  
+  if (!requiredOk) {
+    alert('❌ 請填寫所有必填欄位')
+    return
+  }
 
   const payload = {
     ...form,
@@ -346,20 +395,34 @@ async function onSubmit(){
 
   try{
     submitting.value = true
-    await http.post('/posts', payload)
-    alert('已送出！')
+    console.log('🚀 開始提交刊登資料:', payload)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.post('/api/posts', payload)
+    
+    console.log('✅ 刊登成功:', response.data)
+    alert('✅ 已送出！')
     step.value = 2
-    // 若你有 user store 可判斷角色，這裡先一律導到我的進度
+    
+    // 導到我的進度頁面
     router.push({ path: '/my-adopt-progress', query: { status: 'pending' } })
-  }catch(err){
-    if (err?.response?.status === 401){
-      // 未登入：導到登入，並記錄回跳
+    
+  } catch(err) {
+    console.error('💥 刊登失敗:', err)
+    
+    if (err.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
       sessionStorage.setItem('redirect', '/post/adopt')
       router.push('/login')
-    }else{
-      alert('送出失敗，請稍後再試')
+    } else if (err.response?.status === 400) {
+      alert(`❌ 資料格式錯誤: ${err.response?.data?.message || '請檢查填寫內容'}`)
+    } else if (err.response?.status === 403) {
+      alert('❌ 沒有權限刊登')
+    } else {
+      alert(`❌ 送出失敗: ${err.response?.data?.message || err.message}`)
     }
-  }finally{
+  } finally {
     submitting.value = false
   }
 }
@@ -367,6 +430,7 @@ async function onSubmit(){
 // ===== 置頂按鈕 =====
 const showTop = ref(false)
 function toTop(){ window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
 onMounted(() => {
   loadAreas()
   window.addEventListener('scroll', () => { showTop.value = window.scrollY > 200 })

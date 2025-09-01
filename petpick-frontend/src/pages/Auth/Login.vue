@@ -117,7 +117,8 @@ async function onSubmit() {
     user.setUser({
       userId: status.userId || '',
       username: status.username || '',
-      token
+    role: status.role || '',
+      token: token
     })
 
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'

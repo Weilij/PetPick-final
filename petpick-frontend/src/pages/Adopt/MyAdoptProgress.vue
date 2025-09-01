@@ -119,16 +119,23 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import http from '@/utils/http'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 // === 狀態 ===
 const loading = ref(false)
 const posts = ref([])
 
-// 預設把使用者視為已登入（後端登入壞掉也能看畫面）
-const auth = ref({ loggedIn: true, role: 'USER' })
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
 
 // 讀 query.status：pending / approved（預設 pending）
 const statusParam = computed(() => (route.query.status === 'approved' ? 'approved' : 'pending'))
@@ -148,41 +155,53 @@ function badge(s) {
 }
 
 // === 資料 ===
-async function getAuth() {
-  // 嘗試讀取真實登入狀態；若失敗，仍保留 loggedIn=true（前端開發用）
-  try {
-    const r = await fetch('/api/auth/status', { credentials: 'include' })
-    if (r.ok) {
-      const data = await r.json()
-      auth.value = {
-        loggedIn: data?.loggedIn ?? true,
-        role: data?.role || 'USER'
-      }
-    }
-  } catch { /* ignore */ }
-}
-
 async function load() {
   loading.value = true
   posts.value = []
   try {
+    // 檢查認證狀態
+    if (!auth.value.loggedIn) {
+      alert('❌ 請先登入才能查看刊登')
+      router.push('/login')
+      return
+    }
+
     if (statusParam.value === 'approved') {
       // 已完成頁籤：併入 on_hold
-      const [r1, r2] = await Promise.all([
-        fetch('/api/posts/my?status=approved', { credentials: 'include' }),
-        fetch('/api/posts/my?status=on_hold', { credentials: 'include' })
+      const [response1, response2] = await Promise.all([
+        http.get('/api/posts/my?status=approved'),
+        http.get('/api/posts/my?status=on_hold')
       ])
-      const a = r1.ok ? await r1.json() : []
-      const b = r2.ok ? await r2.json() : []
+      
+      const a = response1.data || []
+      const b = response2.data || []
       posts.value = [...a, ...b].sort(
         (x, y) => new Date(y.createdAt) - new Date(x.createdAt)
       )
+      
+      console.log('✅ 成功取得已完成刊登資料:', posts.value.length, '筆')
     } else {
-      const r = await fetch(`/api/posts/my?status=${encodeURIComponent(statusParam.value)}`, { credentials: 'include' })
-      posts.value = r.ok ? await r.json() : []
+      // ✅ 使用 http axios 實例，會自動帶 JWT token
+      const response = await http.get(`/api/posts/my?status=${encodeURIComponent(statusParam.value)}`)
+      posts.value = response.data || []
+      
+      console.log('✅ 成功取得刊登資料:', posts.value.length, '筆')
     }
   } catch (e) {
-    console.error(e)
+    console.error('💥 載入刊登失敗:', e)
+    
+    // ✅ 處理不同的錯誤情況
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (e.response?.status === 403) {
+      alert('❌ 沒有權限查看刊登')
+    } else {
+      alert(`❌ 載入失敗: ${e.response?.data?.message || e.message}`)
+    }
+    
     posts.value = []
   } finally {
     loading.value = false
@@ -195,36 +214,92 @@ function switchTab(to) {
 }
 
 async function cancelPost(id) {
-  if (!confirm('確定要取消這筆刊登嗎？')) return
-  const ok = await fetch(`/api/posts/${id}/cancel`, {
-    method: 'PATCH', credentials: 'include'
-  }).then(r => r.ok)
-  alert(ok ? '已取消' : '取消失敗')
-  if (ok) load()
+  try {
+    if (!confirm('確定要取消這筆刊登嗎？')) return
+    
+    console.log('🚀 取消刊登 ID:', id)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    await http.patch(`/api/posts/${id}/cancel`)
+    
+    console.log('✅ 取消刊登成功')
+    alert('✅ 已取消')
+    await load()
+  } catch (e) {
+    console.error('💥 取消刊登失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此刊登')
+    } else {
+      alert(`❌ 取消失敗: ${e.response?.data?.message || e.message}`)
+    }
+  }
 }
 
 async function holdPost(id, hold = true) {
-  const msg = hold ? '暫停上架？' : '恢復上架？'
-  if (!confirm(msg)) return
-  const ok = await fetch(`/api/posts/${id}/hold?hold=${hold}`, {
-    method: 'PATCH', credentials: 'include'
-  }).then(r => r.ok)
-  alert(ok ? '已更新' : '更新失敗')
-  if (ok) load()
+  try {
+    const msg = hold ? '暫停上架？' : '恢復上架？'
+    if (!confirm(msg)) return
+    
+    console.log('🚀', hold ? '暫停' : '恢復', '刊登 ID:', id)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    await http.patch(`/api/posts/${id}/hold`, { hold })
+    
+    console.log('✅', hold ? '暫停' : '恢復', '成功')
+    alert('✅ 已更新')
+    await load()
+  } catch (e) {
+    console.error('💥 暫停/恢復失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此刊登')
+    } else {
+      alert(`❌ 更新失敗: ${e.response?.data?.message || e.message}`)
+    }
+  }
 }
 
 async function closePost(id) {
-  if (!confirm('確定要關閉（代表已送養完成）？')) return
-  const ok = await fetch(`/api/posts/${id}/close`, {
-    method: 'PATCH', credentials: 'include'
-  }).then(r => r.ok)
-  alert(ok ? '已關閉' : '關閉失敗')
-  if (ok) load()
+  try {
+    if (!confirm('確定要關閉（代表已送養完成）？')) return
+    
+    console.log('🚀 關閉刊登 ID:', id)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    await http.patch(`/api/posts/${id}/close`)
+    
+    console.log('✅ 關閉刊登成功')
+    alert('✅ 已關閉')
+    await load()
+  } catch (e) {
+    console.error('💥 關閉刊登失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此刊登')
+    } else {
+      alert(`❌ 關閉失敗: ${e.response?.data?.message || e.message}`)
+    }
+  }
 }
 
 // === lifecycle ===
 onMounted(async () => {
-  await getAuth()   // 不做任何導轉
   await load()
 })
 watch(() => statusParam.value, load)

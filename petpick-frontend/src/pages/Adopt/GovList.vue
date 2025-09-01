@@ -143,9 +143,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+// 完整的 script setup 部分
+import { ref, reactive, computed, onMounted } from 'vue' // 確保這行存在且正確
+import http from '@/utils/http'
 
-const API_BASE = '' // 已設 Vite 代理 /api → 後端，留空即可
+const API_BASE = '' // 不需要了，因為使用 http
 
 const pageSize = 12
 const loading = ref(false)
@@ -209,7 +211,7 @@ const onImgError = (e) => {
 }
 
 const buildUrl = () => {
-  const url = new URL('/api/pets', window.location.origin)
+  const url = new URL('/api/pets', 'http://localhost:8080') // 直接建立完整 URL
   url.searchParams.set('page', page.number)
   url.searchParams.set('size', pageSize)
   if (filters.shelter) url.searchParams.set('shelter', filters.shelter)
@@ -224,14 +226,16 @@ const buildUrl = () => {
 const loadPets = async () => {
   loading.value = true
   try {
-    const u = buildUrl().toString()
-    const res = await fetch(u)
-    const data = await res.json()
+    const u = buildUrl()
+    console.log('載入寵物資料，URL:', u.toString())
+    // 只傳送路徑和查詢參數給 http.get，因為 baseURL 已經是完整的後端地址
+    const { data } = await http.get(u.pathname + u.search)
+    console.log('寵物資料載入成功:', data)
     pets.value = data.content || []
     page.number = data.number ?? 0
     page.totalPages = data.totalPages ?? 1
   } catch (e) {
-    console.error('載入失敗：', e)
+    console.error('載入寵物資料失敗：', e)
     alert('資料載入失敗，請稍後再試。')
   } finally {
     loading.value = false
@@ -239,20 +243,47 @@ const loadPets = async () => {
 }
 
 const loadShelters = async () => {
-  const data = await (await fetch(`${API_BASE}/api/shelters`)).json()
-  shelters.value = data || []
+  try {
+    console.log('載入收容所資料...')
+    const { data } = await http.get('/api/shelters')
+    console.log('收容所資料載入成功:', data)
+    shelters.value = data || []
+  } catch (error) {
+    console.error('載入收容所資料失敗:', error)
+  }
 }
+
 const loadKinds = async () => {
-  const data = await (await fetch(`${API_BASE}/api/kinds`)).json()
-  kinds.value = data || []
+  try {
+    console.log('載入種類資料...')
+    const { data } = await http.get('/api/kinds')
+    console.log('種類資料載入成功:', data)
+    kinds.value = data || []
+  } catch (error) {
+    console.error('載入種類資料失敗:', error)
+  }
 }
+
 const loadSexes = async () => {
-  const data = await (await fetch(`${API_BASE}/api/sexes`)).json()
-  sexes.value = data || []
+  try {
+    console.log('載入性別資料...')
+    const { data } = await http.get('/api/sexes')
+    console.log('性別資料載入成功:', data)
+    sexes.value = data || []
+  } catch (error) {
+    console.error('載入性別資料失敗:', error)
+  }
 }
+
 const loadAges = async () => {
-  const data = await (await fetch(`${API_BASE}/api/ages`)).json()
-  ages.value = data || []
+  try {
+    console.log('載入年齡資料...')
+    const { data } = await http.get('/api/ages')
+    console.log('年齡資料載入成功:', data)
+    ages.value = data || []
+  } catch (error) {
+    console.error('載入年齡資料失敗:', error)
+  }
 }
 
 const go = (n) => {
@@ -288,13 +319,24 @@ const showBackToTop = ref(false)
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 onMounted(async () => {
+  console.log('GovList 元件載入中...')
+  
   window.addEventListener('scroll', () => {
     showBackToTop.value = window.scrollY > 200
   })
-  await Promise.all([loadShelters(), loadKinds(), loadSexes(), loadAges()])
-  await loadPets()
+  
+  try {
+    console.log('開始載入所有資料...')
+    await Promise.all([loadShelters(), loadKinds(), loadSexes(), loadAges()])
+    console.log('下拉選單資料載入完成')
+    await loadPets()
+    console.log('所有資料載入完成')
+  } catch (error) {
+    console.error('載入資料時發生錯誤:', error)
+  }
 })
 </script>
+
 
 <style scoped>
 /* 固定卡片與圖片區高度 + 一致化外觀 */

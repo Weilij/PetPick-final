@@ -12,11 +12,9 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 
-import { useUserStore } from '@/stores/user'
-
-
-useUserStore().load()
-
-
-
 app.mount('#app')
+
+// 在應用掛載後載入用戶資料
+import { useUserStore } from '@/stores/user'
+const userStore = useUserStore()
+userStore.load()

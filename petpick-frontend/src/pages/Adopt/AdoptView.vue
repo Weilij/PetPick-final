@@ -1,6 +1,17 @@
 <template>
   <main class="adopt-view-page container py-4">
     <h2 class="text-center mb-3">🐾 領養認養詳情</h2>
+    
+    <!-- ✅ 使用 store 的認證資訊 -->
+    <div class="alert alert-info" style="font-size: 0.8em;">
+      <strong>除錯資訊：</strong><br>
+      認證狀態: {{ userStore.isLogin ? '已登入' : '未登入' }}<br>
+      用戶角色: {{ userStore.role || '無' }}<br>
+      用戶 ID: {{ userStore.userId || '無' }}<br>
+      用戶名稱: {{ userStore.username || '無' }}<br>
+      貼文來源: {{ post.sourceType || '載入中' }}<br>
+      貼文狀態: {{ post.status || '載入中' }}
+    </div>
 
     <!-- 載入/錯誤 -->
     <div v-if="loading" class="text-center text-muted my-5">資料載入中…</div>
@@ -160,16 +171,25 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import http from '@/utils/http'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 // ------------ state ------------
 const loading = ref(true)
 const error = ref(false)
 const post = ref({})
-const auth = ref({ loggedIn: false, role: null, uid: null })
 const applyMsg = ref('')
+
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
 
 // ------------ helpers ------------
 const normalizeSex = (s) => {
@@ -219,109 +239,152 @@ const canControl = computed(() => {
 })
 
 // ------------ API ------------
-async function getAuth() {
-  try {
-    const r = await fetch('/api/auth/status', { credentials: 'include' })
-    if (!r.ok) return
-    const data = await r.json()
-    auth.value = { loggedIn: !!data?.loggedIn, role: data?.role, uid: data?.uid ?? data?.userId ?? null }
-  } catch { /* ignore */ }
-}
-
 async function load() {
   loading.value = true
   error.value = false
   try {
-    const id = route.query.id
-    if (!id) throw new Error('missing id')
+    const id = route.params.id || route.query.id
+    console.log('🆔 載入 ID:', id)
+    
+    if (!id) {
+      throw new Error('缺少貼文 ID')
+    }
 
-    await getAuth()
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.get(`/api/adopts/${id}`)
+    
+    console.log('✅ 成功取得資料:', response.data)
+    post.value = response.data
 
-    const r = await fetch(`/api/adopts/${id}`, { credentials: 'include' })
-    if (!r.ok) throw new Error(await r.text())
-    const data = await r.json()
-    post.value = data
-
-    // 若未公開，且非擁有者/管理員 → 擋下
     if (post.value.status !== 'approved' && !canControl.value) {
+      console.warn('⚠️ 貼文未公開且無權限查看')
       error.value = true
     }
   } catch (e) {
-    console.error(e)
+    console.error('💥 載入失敗:', e)
     error.value = true
+    
+    // ✅ 處理不同的錯誤情況
+    if (e.response?.status === 403) {
+      alert('❌ 沒有權限查看此貼文')
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此貼文')
+    } else if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else {
+      alert(`❌ 載入失敗: ${e.message}`)
+    }
   } finally {
     loading.value = false
   }
 }
 
-// ------------ Actions ------------
-function onImgError(e) {
-  e.target.onerror = null
-  e.target.src = '/images/no-image.jpg'
-}
-
 async function apply() {
-  const id = route.query.id
+  const id = route.params.id || route.query.id
   try {
-    const r = await fetch(`/api/adopts/${id}/apply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ message: applyMsg.value || null }),
+    if (!auth.value.loggedIn) {
+      alert('❌ 請先登入才能申請領養')
+      router.push('/login')
+      return
+    }
+
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.post(`/api/adopts/${id}/apply`, {
+      message: applyMsg.value || null
     })
-    if (r.status === 409) { alert('你已申請過了，請等待審核。'); return }
-    if (!r.ok) throw new Error(await r.text() || '申請失敗')
-    alert('已送出申請！')
+
+    console.log('✅ 申請成功:', response.data)
+    alert('✅ 已送出申請！')
     await load()
   } catch (e) {
-    console.error(e)
-    alert('申請失敗')
+    console.error('💥 申請失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    }
+
+    if (e.response?.status === 409) {
+      alert('你已申請過了，請等待審核。')
+      return
+    }
+
+    alert(`❌ 申請失敗: ${e.response?.data?.message || e.message}`)
   }
 }
 
 async function cancelMyApplication() {
   try {
-    if (!confirm('確定要取消這筆申請？')) return
-    const id = post.value.myPendingApplicationId
-    const ok = await fetch(`/api/applications/${id}/cancel`, { method: 'PATCH', credentials: 'include' })
-      .then((r) => r.ok)
-    alert(ok ? '已取消' : '取消失敗')
-    if (ok) await load()
+    if (!confirm('確定取消申請？')) return
+    
+    // ✅ 使用 http axios 實例
+    await http.delete(`/api/adopts/${post.value.id}/apply`)
+    
+    alert('✅ 已取消申請')
+    await load()
   } catch (e) {
-    console.error(e)
-    alert('取消失敗')
+    console.error('💥 取消申請失敗:', e)
+    alert(`❌ 取消申請失敗: ${e.response?.data?.message || e.message}`)
   }
 }
 
-// 擁有者/管理員控制
 async function ownerCancel() {
   try {
     if (!confirm('確定取消這筆刊登？')) return
-    const ok = await fetch(`/api/posts/${post.value.id}/cancel`, { method: 'PATCH', credentials: 'include' }).then((r) => r.ok)
-    alert(ok ? '已取消' : '取消失敗')
-    if (ok) await load()
-  } catch { alert('取消失敗') }
+    
+    // ✅ 使用 http axios 實例
+    await http.patch(`/api/posts/${post.value.id}/cancel`)
+    
+    alert('✅ 已取消')
+    await load()
+  } catch (e) {
+    console.error('💥 取消刊登失敗:', e)
+    alert(`❌ 取消失敗: ${e.response?.data?.message || e.message}`)
+  }
 }
+
 async function ownerHold(hold) {
   try {
     if (!confirm(hold ? '暫停上架？' : '恢復上架？')) return
-    const ok = await fetch(`/api/posts/${post.value.id}/hold?hold=${hold}`, { method: 'PATCH', credentials: 'include' }).then((r) => r.ok)
-    alert(ok ? (hold ? '已暫停' : '已恢復') : '操作失敗')
-    if (ok) await load()
-  } catch { alert('操作失敗') }
+    
+    // ✅ 使用 http axios 實例
+    await http.patch(`/api/posts/${post.value.id}/hold`, { hold })
+    
+    alert(hold ? '✅ 已暫停' : '✅ 已恢復')
+    await load()
+  } catch (e) {
+    console.error('💥 暫停/恢復操作失敗:', e)
+    alert(`❌ 操作失敗: ${e.response?.data?.message || e.message}`)
+  }
 }
+
 async function ownerClose() {
   try {
     if (!confirm('確定關閉（已送養完成）？')) return
-    const ok = await fetch(`/api/posts/${post.value.id}/close`, { method: 'PATCH', credentials: 'include' }).then((r) => r.ok)
-    alert(ok ? '已關閉' : '關閉失敗')
-    if (ok) await load()
-  } catch { alert('關閉失敗') }
+    
+    // ✅ 使用 http axios 實例
+    await http.patch(`/api/posts/${post.value.id}/close`)
+    
+    alert('✅ 已關閉')
+    await load()
+  } catch (e) {
+    console.error('💥 關閉貼文失敗:', e)
+    alert(`❌ 關閉失敗: ${e.response?.data?.message || e.message}`)
+  }
+}
+
+// 圖片錯誤處理
+function onImgError(event) {
+  event.target.src = '/images/no-image.jpg'
 }
 
 // ------------ lifecycle ------------
 onMounted(load)
-watch(() => route.query.id, load)
+watch(() => route.params.id || route.query.id, load)
 </script>
 
 <style scoped>

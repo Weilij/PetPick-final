@@ -151,6 +151,19 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import http from '@/utils/http'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
 
 // ===== 常數 / 標籤定義 =====
 const tagDefs = [
@@ -288,6 +301,14 @@ function toIso(v) {
 }
 
 async function onSubmit() {
+  // 檢查認證狀態
+  if (!auth.value.loggedIn) {
+    alert('❌ 請先登入才能上傳任務')
+    sessionStorage.setItem('redirect', '/mission/upload')
+    router.push('/login')
+    return
+  }
+
   // 時間檢查
   const now = new Date()
   const s = new Date(form.startTimeRaw)
@@ -298,7 +319,7 @@ async function onSubmit() {
   if (ed <= s) { alert('結束時間必須晚於開始時間'); return }
 
   const payload = {
-    posterId: window.CURRENT_USER_ID ?? 1,
+    posterId: auth.value.uid,
     title: form.title.trim(),
     description: form.description.trim(),
     city: (form.city || '').trim(),
@@ -314,23 +335,46 @@ async function onSubmit() {
   }
 
   const fd = new FormData()
-  fd.append('data', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
-  selectedFiles.value.slice(0, 5).forEach(f => fd.append('images', f))
+  fd.append('data', JSON.stringify(payload))
+
+  // 加上圖片
+  selectedFiles.value.slice(0, 5).forEach(f => {
+    fd.append('images', f)
+  })
 
   submitting.value = true
   try {
-    const res = await fetch('/api/missions/upload', { method: 'POST', body: fd })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      alert('上傳失敗：' + (json.message || res.status))
-      return
-    }
-    alert('上傳成功')
-    // 可視需要清空表單
-    // resetForm()
+    console.log('🚀 開始上傳任務:', payload)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.post('/api/missions/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    console.log('✅ 上傳成功:', response.data)
+    alert('✅ 上傳成功')
+    
+    // 可視需要清空表單或導向其他頁面
+    resetForm()
+    // router.push('/missions') // 導向任務列表頁面
+    
   } catch (err) {
-    console.error(err)
-    alert('發生錯誤，請稍後重試')
+    console.error('💥 上傳失敗:', err)
+    
+    if (err.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      sessionStorage.setItem('redirect', '/mission/upload')
+      router.push('/login')
+    } else if (err.response?.status === 400) {
+      alert(`❌ 資料格式錯誤: ${err.response?.data?.message || '請檢查填寫內容'}`)
+    } else if (err.response?.status === 403) {
+      alert('❌ 沒有權限上傳任務')
+    } else if (err.response?.status === 413) {
+      alert('❌ 檔案太大，請選擇較小的圖片')
+    } else {
+      alert(`❌ 上傳失敗: ${err.response?.data?.message || err.message}`)
+    }
   } finally {
     submitting.value = false
   }
@@ -353,3 +397,47 @@ function resetForm() {
   previewThumbs.value = []
 }
 </script>
+
+<style scoped>
+/* 任務標籤樣式 */
+.mission-tag {
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+/* 表單按鈕樣式 */
+.tag-btn {
+  font-size: 0.85em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+}
+
+/* 預覽區域樣式 */
+.carousel-item img {
+  object-fit: cover;
+  height: 300px;
+}
+
+/* 縮圖樣式 */
+.img-thumbnail {
+  border-radius: 8px;
+}
+
+/* 提交按鈕樣式 */
+.btn[style*="burlywood"] {
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 2rem;
+  border-radius: 25px;
+}
+
+.btn[style*="burlywood"]:hover {
+  background-color: #daa520 !important;
+}
+
+.btn[style*="burlywood"]:disabled {
+  background-color: #cccccc !important;
+  cursor: not-allowed;
+}
+</style>

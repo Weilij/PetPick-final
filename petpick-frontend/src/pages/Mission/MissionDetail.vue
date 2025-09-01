@@ -135,178 +135,245 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import http from '@/utils/http'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import http from '@/utils/http'
 
 const route = useRoute()
-const userStore = useUserStore?.()
-const fallbackImg = '/assets/default-avatar.png'
+const router = useRouter()
+const userStore = useUserStore()
 
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
+
+// 任務詳情頁面的狀態
 const m = ref(null)
-const images = ref([fallbackImg])
+const images = ref([])
 const currentIndex = ref(0)
+const applying = ref(false)
 const loading = ref(false)
 const error = ref('')
+const fallbackImg = '/images/no-image.jpg'
 const presenceText = ref('⚪ 離線')
 const isFavorited = ref(false)
 const missionIdRef = ref(null)
 
+// 計算屬性
 const isOwner = computed(() => Number(m.value?.poster?.posterId) === currentUserId())
 const tagLine = computed(() => {
   const arr = Array.isArray(m.value?.tags) ? m.value.tags : []
   return arr.length ? arr.map(t => `#${t}`).join(' ') : '無標籤'
 })
 
+// 載入任務詳情
 onMounted(async () => {
   const qId = new URLSearchParams(location.search).get('id')
   const missionId = Number(route.params.id ?? route.params.missionId ?? qId)
-  if (!missionId) { alert('缺少任務 ID'); return }
+  if (!missionId) { 
+    alert('缺少任務 ID')
+    return 
+  }
   missionIdRef.value = missionId
 
   loading.value = true
   try {
-    const { data } = await http.get(`/api/missions/${missionId}`)
-    m.value = data
+    console.log('🚀 開始載入任務詳情，ID:', missionId)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.get(`/api/missions/${missionId}`)
+    m.value = response.data
 
-    const arr = Array.isArray(data.imageUrls) && data.imageUrls.length ? data.imageUrls : []
-    const first = data.imageUrl ? [data.imageUrl] : []
+    // 處理圖片
+    const arr = Array.isArray(response.data.imageUrls) && response.data.imageUrls.length ? response.data.imageUrls : []
+    const first = response.data.imageUrl ? [response.data.imageUrl] : []
     const combined = [...first, ...arr].filter(Boolean)
     images.value = combined.length ? combined : [fallbackImg]
 
     await initFavoriteCheck()
+    
+    console.log('✅ 任務詳情載入完成:', response.data)
   } catch (e) {
-    console.error(e)
-    error.value = '載入任務資料失敗，請稍後再試。'
+    console.error('💥 載入任務詳情失敗:', e)
+    
+    if (e.response?.status === 401) {
+      error.value = '認證已過期，請重新登入'
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else if (e.response?.status === 404) {
+      error.value = '找不到此任務'
+    } else if (e.response?.status === 403) {
+      error.value = '沒有權限查看此任務'
+    } else {
+      error.value = e.response?.data?.message || e.message || '載入任務資料失敗，請稍後再試。'
+    }
   } finally {
     loading.value = false
   }
 })
 
-function onApply () {
+// 申請任務
+async function onApply() {
   if (!m.value?.missionId) return
+  if (!auth.value.loggedIn) {
+    alert('❌ 請先登入才能申請任務')
+    router.push('/login')
+    return
+  }
   if (!confirm('確認送出申請？')) return
-  applyFlow(m.value.missionId, currentUserId())
-}
-
-async function applyFlow (missionId, applicantId) {
-  const btn = document.getElementById('btn-apply')
-  setBusy(true)
+  
+  applying.value = true
   try {
-    const { status, data } = await http.post(
-      '/api/applications',
-      null,
-      { params: { missionId, applicantId } }
-    )
-    const body = typeof data === 'string' ? data : JSON.stringify(data)
-
-    if (status >= 200 && status < 300 || /already|duplicate/i.test(body)) {
-      await goChat(missionId, applicantId)
-      return
-    }
-    if (status === 409 && /matched|accepted/i.test(body)) {
-      alert('任務已配對完成')
-      setBusy(false)
-      return
-    }
-    alert('申請失敗：' + body)
+    console.log('🚀 開始申請任務:', m.value.missionId)
+    
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.post('/api/applications', {
+      missionId: m.value.missionId,
+      applicantId: auth.value.uid
+    })
+    
+    console.log('✅ 申請成功:', response.data)
+    alert('✅ 申請成功！')
+    
+    // 可以導向聊天頁面或其他後續流程
+    
   } catch (e) {
-    console.error(e)
-    alert('申請失敗，請稍後再試')
+    console.error('💥 申請失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+    } else if (e.response?.status === 409) {
+      alert('你已申請過此任務或任務已配對完成')
+    } else {
+      alert(`❌ 申請失敗: ${e.response?.data?.message || e.message}`)
+    }
   } finally {
-    setBusy(false)
-  }
-
-  function setBusy (b) {
-    if (!btn) return
-    btn.disabled = b
-    btn.innerHTML = b
-      ? `<span class="spinner-border spinner-border-sm me-1"></span>送出中`
-      : `<span class="material-icons">insert_comment</span> 請求接取任務`
+    applying.value = false
   }
 }
 
-async function goChat (missionId, applicantId) {
-  try {
-    const { data } = await http.post(
-      '/api/chat/conversations',
-      null,
-      { params: { missionId, applicantId } }
-    )
-    const cid = typeof data === 'number' ? data : Number(data?.id ?? data)
-    if (!cid) throw new Error('invalid conversation id')
-    location.href = `/finalProject/mission/chat.html?conversationId=${cid}`
-  } catch (e) {
-    console.error(e)
-    alert('建立對話失敗')
-  }
-}
-
-async function onShare () {
+// 分享功能
+async function onShare() {
   const title = m.value?.title || 'PetPick 任務'
   const url = location.href
   if (navigator.share) {
-    try { await navigator.share({ title, text: '看看這個任務～', url }); return } catch {}
+    try { 
+      await navigator.share({ title, text: '看看這個任務～', url })
+      return 
+    } catch {}
   }
-  try { await navigator.clipboard.writeText(url); alert('連結已複製到剪貼簿') }
-  catch { prompt('複製這個連結', url) }
+  try { 
+    await navigator.clipboard.writeText(url)
+    alert('連結已複製到剪貼簿') 
+  } catch { 
+    prompt('複製這個連結', url) 
+  }
 }
 
-// ---- favorites: API + localStorage fallback ----
+// 收藏功能
 const LS_KEY = 'petpick:favs'
-function lsLoadSet(){ try{return new Set(JSON.parse(localStorage.getItem(LS_KEY)||'[]'))}catch{return new Set()} }
-function lsSaveSet(set){ try{localStorage.setItem(LS_KEY, JSON.stringify(Array.from(set)))}catch{} }
-function lsIsFav(id){ return id!=null && lsLoadSet().has(String(id)) }
-function lsAddFav(id){ if(id==null) return false; const s=lsLoadSet(), k=String(id); if(s.has(k)) return false; s.add(k); lsSaveSet(s); return true }
-function lsRemoveFav(id){ if(id==null) return false; const s=lsLoadSet(), k=String(id); const ok=s.delete(k); lsSaveSet(s); return ok }
+function lsLoadSet() { 
+  try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')) } 
+  catch { return new Set() } 
+}
+function lsSaveSet(set) { 
+  try { localStorage.setItem(LS_KEY, JSON.stringify(Array.from(set))) } 
+  catch {} 
+}
+function lsIsFav(id) { 
+  return id != null && lsLoadSet().has(String(id)) 
+}
+function lsAddFav(id) { 
+  if (id == null) return false
+  const s = lsLoadSet(), k = String(id)
+  if (s.has(k)) return false
+  s.add(k)
+  lsSaveSet(s)
+  return true 
+}
+function lsRemoveFav(id) { 
+  if (id == null) return false
+  const s = lsLoadSet(), k = String(id)
+  const ok = s.delete(k)
+  lsSaveSet(s)
+  return ok 
+}
 
-async function apiFavCheck(userId, missionId){
-  const { data } = await http.get('/favorites/check', { params:{ userId, missionId } })
-  return data // { favorited: boolean }
-}
-async function apiFavAdd(userId, missionId){
-  await http.post('/favorites', null, { params:{ userId, missionId } })
-}
-async function apiFavRemove(userId, missionId){
-  await http.delete('/favorites', { params:{ userId, missionId } })
+async function apiFavCheck(userId, missionId) {
+  const response = await http.get('/api/favorites/check', { 
+    params: { userId, missionId } 
+  })
+  return response.data
 }
 
-async function initFavoriteCheck(){
+async function apiFavAdd(userId, missionId) {
+  await http.post('/api/favorites', { userId, missionId })
+}
+
+async function apiFavRemove(userId, missionId) {
+  await http.delete('/api/favorites', { 
+    params: { userId, missionId } 
+  })
+}
+
+async function initFavoriteCheck() {
   const mid = missionIdRef.value
-  if(!mid) return
-  const uid = currentUserId()
-  try{
+  if (!mid) return
+  const uid = auth.value.uid
+  try {
     const data = await apiFavCheck(uid, mid)
     isFavorited.value = !!data?.favorited
-  }catch(e){
+  } catch (e) {
     // 後端失敗 → 用 localStorage 狀態
     isFavorited.value = lsIsFav(mid)
   }
 }
 
-async function onFav(){
+async function onFav() {
   const mid = missionIdRef.value
-  if(!mid) return
-  const uid = currentUserId()
+  if (!mid) return
+  
+  if (!auth.value.loggedIn) {
+    alert('❌ 請先登入才能收藏')
+    router.push('/login')
+    return
+  }
+  
+  const uid = auth.value.uid
   const prev = isFavorited.value
   // 先切 UI，失敗再回滾
   isFavorited.value = !prev
-  try{
-    if(isFavorited.value){
-      try{ await apiFavAdd(uid, mid) }catch{ lsAddFav(mid) }
-    }else{
-      try{ await apiFavRemove(uid, mid) }catch{ lsRemoveFav(mid) }
+  
+  try {
+    if (isFavorited.value) {
+      try { 
+        await apiFavAdd(uid, mid) 
+      } catch { 
+        lsAddFav(mid) 
+      }
+    } else {
+      try { 
+        await apiFavRemove(uid, mid) 
+      } catch { 
+        lsRemoveFav(mid) 
+      }
     }
-  }catch(e){
+  } catch (e) {
     isFavorited.value = prev
   }
 }
 
-function currentUserId () {
-  return window.CURRENT_USER_ID ?? userStore?.userId ?? 1
+// 工具函數
+function currentUserId() {
+  return auth.value.uid || 1
 }
 
-function fmt (str) {
+function fmt(str) {
   if (!str) return ''
   const d = new Date(str)
   return d.toLocaleString('zh-TW', {
@@ -314,5 +381,8 @@ function fmt (str) {
     hour: '2-digit', minute: '2-digit', hour12: false
   })
 }
-function onImgError (e) { e.target.src = fallbackImg }
+
+function onImgError(e) { 
+  e.target.src = fallbackImg 
+}
 </script>

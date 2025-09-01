@@ -216,10 +216,13 @@ const badge = (srcType) =>
 
 // === API URL ===
 const buildUrl = () => {
-  const url = new URL('/api/adopts', window.location.origin)
+  // ✅ 確保使用正確的後端地址
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  const url = new URL('/api/adopts', baseURL)
+  
   url.searchParams.set('page', page.number)
   url.searchParams.set('size', pageSize)
-  url.searchParams.set('status', 'approved')
+  
   if (filters.city) url.searchParams.set('city', filters.city)
   if (filters.district) url.searchParams.set('district', filters.district)
   if (filters.species) url.searchParams.set('species', filters.species)
@@ -227,6 +230,7 @@ const buildUrl = () => {
   if (filters.age) url.searchParams.set('age', filters.age)
   if (filters.sourceType) url.searchParams.set('sourceType', filters.sourceType)
   if (filters.keyword) url.searchParams.set('q', filters.keyword)
+  
   return url
 }
 
@@ -234,16 +238,70 @@ const buildUrl = () => {
 const loadPosts = async () => {
   loading.value = true
   try {
-    const u = buildUrl().toString()
-    const res = await fetch(u)
-    if (!res.ok) throw new Error(await res.text())
+    const url = buildUrl().toString()
+    console.log('🚀 請求 URL:', url)
+    
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        // 如果有認證 token，可以加上
+        // 'Authorization': `Bearer ${getToken()}`
+      },
+      // ✅ 處理 CORS
+      mode: 'cors',
+      credentials: 'include'
+    })
+    
+    console.log('📡 回應狀態:', res.status)
+    console.log('📋 回應標頭:', Object.fromEntries(res.headers.entries()))
+    
+    if (!res.ok) {
+      let errorMessage = `HTTP ${res.status}`
+      try {
+        const errorText = await res.text()
+        console.error('❌ API 錯誤回應:', errorText)
+        errorMessage += `: ${errorText}`
+      } catch (parseError) {
+        console.error('❌ 無法解析錯誤回應:', parseError)
+      }
+      throw new Error(errorMessage)
+    }
+    
     const data = await res.json()
-    posts.value = data.content || []
-    page.number = data.number ?? 0
-    page.totalPages = data.totalPages ?? 1
-  } catch (e) {
-    console.error(e)
-    alert('載入失敗')
+    console.log('✅ API 回應數據:', data)
+    
+    // ✅ 根據後端回應結構調整
+    if (data && typeof data === 'object') {
+      // Spring Boot Page 物件結構
+      posts.value = data.content || []
+      page.number = data.number ?? 0
+      page.totalPages = data.totalPages ?? 1
+      
+      console.log(`📄 載入了 ${posts.value.length} 筆資料，第 ${page.number + 1}/${page.totalPages} 頁`)
+    } else {
+      console.warn('⚠️ 回應格式不符預期:', data)
+      posts.value = []
+    }
+    
+  } catch (error) {
+    console.error('💥 載入失敗:', error)
+    
+    // ✅ 更詳細的錯誤處理
+    let userMessage = '載入失敗'
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      userMessage = '無法連接到伺服器，請檢查網路連線'
+    } else if (error.message.includes('CORS')) {
+      userMessage = 'CORS 錯誤，請聯繫技術支援'
+    } else if (error.message.includes('404')) {
+      userMessage = 'API 端點不存在'
+    } else if (error.message.includes('500')) {
+      userMessage = '伺服器內部錯誤'
+    } else {
+      userMessage = error.message
+    }
+    
+    alert(`❌ ${userMessage}`)
   } finally {
     loading.value = false
   }

@@ -27,14 +27,20 @@
 
           <tr v-for="it in cart" :key="it.cartId">
             <td>
-              <RouterLink :to="{ name: 'productSite', params: { id: String(it.productId) } }"
-                class="text-decoration-none" style="color:black;">
+              <RouterLink
+                :to="{ name: 'ProductSite', params: { id: String(it.productId) } }"
+                class="text-decoration-none"
+                style="color:black;"
+              >
                 <img :src="it.imageUrl || '#'" class="cart-img rounded" alt="商品圖" />
               </RouterLink>
             </td>
             <td>
-              <RouterLink :to="{ name: 'productSite', params: { id: String(it.productId) } }"
-                class="text-decoration-none" style="color:black;">
+              <RouterLink
+                :to="{ name: 'ProductSite', params: { id: String(it.productId) } }"
+                class="text-decoration-none"
+                style="color:black;"
+              >
                 {{ it.pname }}
               </RouterLink>
             </td>

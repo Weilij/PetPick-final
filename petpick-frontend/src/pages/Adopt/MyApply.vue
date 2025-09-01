@@ -81,21 +81,20 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import http from '@/utils/http'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 
-// ===== 模擬登入（後端現在上不去就不擋頁面）=====
-const auth = ref({ loggedIn: true, role: 'USER' })
-async function getAuth() {
-  try {
-    const r = await fetch('/api/auth/status', { credentials: 'include' })
-    if (r.ok) {
-      const data = await r.json()
-      auth.value = { loggedIn: !!data.loggedIn, role: data?.role || 'USER' }
-    }
-  } catch { /* 失敗就維持 loggedIn:true，不擋頁面 */ }
-}
+// ✅ 使用 store 的認證狀態
+const auth = computed(() => ({
+  loggedIn: userStore.isLogin,
+  role: userStore.role,
+  uid: userStore.userId
+}))
 
 // ===== 查詢狀態 =====
 const state = reactive({
@@ -146,21 +145,51 @@ const badge = (s) => ({
 async function load() {
   loading.value = true
   try {
-    const p = new URLSearchParams()
-    p.set('page', state.page); p.set('size', state.size)
-    if (state.status && state.status!=='all') p.set('status', state.status)
-    const r = await fetch(`/api/my/applications?${p}`, { credentials: 'include' })
-    if (!r.ok) throw new Error(await r.text())
-    const data = await r.json()
+    // 檢查認證狀態
+    if (!auth.value.loggedIn) {
+      alert('❌ 請先登入才能查看申請')
+      router.push('/login')
+      return
+    }
+
+    const params = new URLSearchParams()
+    params.set('page', state.page)
+    params.set('size', state.size)
+    if (state.status && state.status !== 'all') {
+      params.set('status', state.status)
+    }
+
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    const response = await http.get(`/api/my/applications?${params}`)
+    const data = response.data
+
+    console.log('✅ 成功取得我的申請資料:', data)
+
     // 兼容 array / spring 分頁
     items.value = Array.isArray(data) ? data : (data.content || [])
     page.number = data.number ?? 0
     page.totalPages = data.totalPages ?? 0
     page.totalElements = data.totalElements ?? items.value.length
+
   } catch (e) {
-    console.error(e)
+    console.error('💥 載入我的申請失敗:', e)
+    
+    // ✅ 處理不同的錯誤情況
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (e.response?.status === 403) {
+      alert('❌ 沒有權限查看申請')
+    } else {
+      alert(`❌ 載入失敗: ${e.response?.data?.message || e.message}`)
+    }
+
     items.value = []
-    page.number = 0; page.totalPages = 0; page.totalElements = 0
+    page.number = 0
+    page.totalPages = 0
+    page.totalElements = 0
   } finally {
     loading.value = false
   }
@@ -174,16 +203,39 @@ function go(n){
 }
 
 async function cancelApply(id){
-  if (!confirm('確定要取消這筆申請？')) return
-  const ok = await fetch(`/api/applications/${id}/cancel`, { method:'PATCH', credentials:'include' }).then(r=>r.ok)
-  alert(ok ? '已取消' : '取消失敗')
-  if (ok) load()
+  try {
+    if (!confirm('確定要取消這筆申請？')) return
+
+    console.log('🚀 取消申請 ID:', id)
+
+    // ✅ 使用 http axios 實例，會自動帶 JWT token
+    await http.patch(`/api/applications/${id}/cancel`)
+
+    console.log('✅ 取消申請成功')
+    alert('✅ 已取消申請')
+    await load()
+
+  } catch (e) {
+    console.error('💥 取消申請失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      router.push('/login')
+      return
+    } else if (e.response?.status === 404) {
+      alert('❌ 找不到此申請')
+    } else if (e.response?.status === 409) {
+      alert('❌ 此申請無法取消')
+    } else {
+      alert(`❌ 取消失敗: ${e.response?.data?.message || e.message}`)
+    }
+  }
 }
 
 onMounted(async () => {
-  await getAuth()
   syncUrl()
-  load()
+  await load()
 })
 </script>
 
