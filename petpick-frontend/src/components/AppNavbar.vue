@@ -75,7 +75,7 @@
               <ul v-if="user.isLogin" class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="accountMenuBtn">
                 <li><RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink></li>
                 <li><RouterLink class="dropdown-item" to="/shop/commodity">我的訂單</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/missions/my">我的任務</RouterLink></li>
+                <li><RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink></li>
                 <li><hr class="dropdown-divider" /></li>
                 <li><button class="dropdown-item text-danger" @click="logout">登出</button></li>
               </ul>

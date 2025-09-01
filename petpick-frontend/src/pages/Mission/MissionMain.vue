@@ -173,9 +173,11 @@ const FALLBACK_IMG = '/assets/default.jpg'
 onMounted(async () => {
   const uid = userStore.userId || 1
   await missionStore.fetchList(uid)
-  ALL.value = Array.isArray(missionStore.list) ? missionStore.list : []
-  VIEW.value = [...ALL.value]
-  hydrateFilters(ALL.value)
+  const raw = Array.isArray(missionStore.list) ? missionStore.list : []
+  const active = raw.filter(isActiveMission)
+  ALL.value = active
+  VIEW.value = [...active]
+  hydrateFilters(active)
 })
 
 // 動態選項
@@ -237,5 +239,12 @@ function debounce(fn, delay = 300) {
     clearTimeout(id)
     id = setTimeout(() => fn(...args), delay)
   }
+}
+function isActiveMission(m) {
+  // 沒有結束時間則視為有效
+  if (!m || !m.endTime) return true;
+  const end = new Date(m.endTime);
+  if (isNaN(end.getTime())) return true; // 無法解析就當作有效
+  return end.getTime() >= Date.now();
 }
 </script>
