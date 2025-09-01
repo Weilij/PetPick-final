@@ -127,7 +127,7 @@ async function onSubmit () {
   submitting.value = true
   try {
     // 後端若仍是 Spring 的 /register，可直接打此路徑
-    await axios.post('/register', {
+await axios.post('/api/auth/register', {
       username: form.value.username,
       accountemail: form.value.accountemail,
       phonenumber: form.value.phonenumber,

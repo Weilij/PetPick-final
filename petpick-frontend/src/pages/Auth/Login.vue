@@ -89,38 +89,44 @@ onMounted(() => {
   if (p && t) { csrf.param = p; csrf.token = t }
 })
 
+// 修改 Login.vue 中的 onSubmit 函數
 async function onSubmit() {
   loading.value = true
   errorMessage.value = ''
 
   try {
-    // 1) Spring Security form-login
-    const params = new URLSearchParams()
-    params.append('username', form.username)
-    params.append('password', form.password)
-    if (csrf.param && csrf.token) params.append(csrf.param, csrf.token)
-
-    await axios.post('/login', params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      withCredentials: true, // 若後端用 session
+    // 確保使用正確的路徑
+    const loginRes = await axios.post('/api/auth/login', {
+      accountemail: form.username,
+      password: form.password
     })
 
-    // 2) 取回當前登入者（請依你的實際 API 調整）
-    // 期望回傳：{ userId, username, token? }；若是 session 流程，token 可忽略
-    const { data } = await axios.get('/api/auth/me', { withCredentials: true })
+    if (!loginRes.data.success) {
+      errorMessage.value = loginRes.data.message || '登入失敗'
+      loading.value = false
+      return
+    }
 
-    // 3) 寫入 Pinia（token 沒有就給空字串）
+    // 儲存 JWT token
+    const token = loginRes.data.token
+    localStorage.setItem('jwt_token', token)
+
+    // 取得使用者狀態 - 注意這裡也要用正確路徑
+    const { data: status } = await axios.get('/api/auth/me') // 改用您定義的端點
+
+    // 設定 pinia user 狀態
     user.setUser({
-      userId: data.userId,
-      username: data.username,
-      token: data.token || ''
+      userId: status.userId || '',
+      username: status.username || '',
+      token: token
     })
 
-    // 4) 跳回 redirect 或首頁
+    // 導回原本頁面或首頁
     const redirect = route.query.redirect || '/'
     router.replace(String(redirect))
   } catch (err) {
-    errorMessage.value = err?.response?.data?.message || '帳號或密碼錯誤，請再試一次'
+    console.error('Login error:', err) // 加入除錯訊息
+    errorMessage.value = err?.response?.data?.message || '登入失敗，請再試一次'
   } finally {
     loading.value = false
   }

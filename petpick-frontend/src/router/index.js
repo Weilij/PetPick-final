@@ -34,6 +34,7 @@ const OrderDetail = () => import('@/pages/Shop/OrderDetail.vue')
 
 
 //Adopt
+const AdoptView = () => import('../pages/Adopt/AdoptView.vue')
 
 // Admin
 const AdminDashboard = () => import('../pages/Admin/AdminDashboard.vue')
@@ -70,10 +71,20 @@ const router = createRouter({
     { path: '/order', name: 'order', component: Order },
     { path: '/orderDetail', name: 'orderDetail', component: OrderDetail },
     //Account
-    { path: '/login', name: 'login', component: () => import('@/pages/Auth/Login.vue') },
+    // { path: '/login', name: 'login', component: () => import('@/pages/Auth/Login.vue') },
 
 
     //Adopt
+    { path: '/gov/list', name: 'GovList', component: () => import('@/pages/Adopt/GovList.vue'), meta: { title: '公立認養 - PetPick' } },
+    { path: '/adopt/list', name: 'AdoptList', component: () => import('@/pages/Adopt/AdoptList.vue') },
+    { path: '/post/adopt', name: 'PostAdopt', component: () => import('@/pages/Adopt/PostAdopt.vue') },
+    { path: '/my-adopt-progress', name: 'MyAdoptProgress', component: () => import('@/pages/Adopt/MyAdoptProgress.vue') },
+    { path: '/my-apply', name: 'MyApply', component: () => import('@/pages/Adopt/MyApply.vue') },
+    { path: '/post-review', name: 'PostReview', component: () => import('@/pages/Adopt/PostReview.vue') },
+    { path: '/apply-review', name: 'ApplyReview', component: () => import('@/pages/Adopt/ApplyReview.vue') },
+    // { path: '/adopt/report', name: 'AdoptReport', component: () => import('@/pages/Adopt/AdoptReport.vue') },
+    { path: '/adopt/view', name: 'AdoptView', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
+    { path: '/adopt/:id', name: 'AdoptViewById', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
 
     // Admin（需要登入）
     { path: '/admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
