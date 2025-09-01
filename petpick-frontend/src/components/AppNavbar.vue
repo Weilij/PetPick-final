@@ -37,7 +37,7 @@
               <RouterLink class="nav-link btn btn-login m-1" to="/missions">尋找任務</RouterLink>
             </li>
             <li class="nav-item">
-              <RouterLink class="nav-link btn btn-login m-1" to="/shop/commodity">寵物商城</RouterLink>
+              <RouterLink class="nav-link btn btn-login m-1" to="/commodity">寵物商城</RouterLink>
             </li>
           </ul>
 
