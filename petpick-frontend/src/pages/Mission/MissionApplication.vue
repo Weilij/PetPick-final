@@ -59,7 +59,7 @@
                   </div>
 
                   <div class="d-flex gap-2 mb-2 justify-content-end">
-                    <button class="btn btn-sm btn-outline" style="background-color: burlywood;"
+                    <button class="btn btn-sm btn-outline text-white" style="background-color: burlywood; border-color: white;"
                       @click="toggleApplicants(m.missionId)">
                       查看申請者
                     </button>
