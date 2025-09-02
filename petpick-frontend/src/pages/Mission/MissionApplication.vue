@@ -4,19 +4,15 @@
 
     <!-- Tabs -->
     <div class="d-flex gap-2 mb-3">
-      <button class="btn btn-sm"
-              :class="activeTab==='all' ? 'btn-dark' : 'btn-outline-dark'"
-              @click="activeTab='all'">
+      <button class="btn btn-sm" :class="activeTab === 'all' ? 'btn-dark' : 'btn-outline-dark'" @click="activeTab = 'all'">
         全部任務（{{ allMissions.length }}）
       </button>
-      <button class="btn btn-sm"
-              :class="activeTab==='ongoing' ? 'btn-dark' : 'btn-outline-dark'"
-              @click="activeTab='ongoing'">
+      <button class="btn btn-sm" :class="activeTab === 'ongoing' ? 'btn-dark' : 'btn-outline-dark'"
+        @click="activeTab = 'ongoing'">
         進行中（{{ ongoingMissions.length }}）
       </button>
-      <button class="btn btn-sm"
-              :class="activeTab==='applied' ? 'btn-dark' : 'btn-outline-dark'"
-              @click="activeTab='applied'">
+      <button class="btn btn-sm" :class="activeTab === 'applied' ? 'btn-dark' : 'btn-outline-dark'"
+        @click="activeTab = 'applied'">
         申請的任務（{{ myApplied.length }}）
       </button>
     </div>
@@ -32,7 +28,9 @@
         <div v-if="listToRender.length === 0" class="text-center text-muted py-5">
           目前沒有任務
           <div class="mt-2">
-            <a href="/finalProject/mission/missionUpload.html" class="btn btn-sm btn-primary">去發布任務</a>
+            <router-link to="/missions/upload" class="btn btn-sm" style="background-color: burlywood;">
+                <span class="material-icons">add_comment</span>發佈任務!
+            </router-link>
           </div>
         </div>
 
@@ -40,11 +38,8 @@
           <div v-for="m in listToRender" :key="m.missionId" class="card mb-3">
             <div class="card-body">
               <div class="d-flex">
-                <img :src="m.imageUrl || fallbackImg"
-                     alt="封面"
-                     class="me-3"
-                     style="width:160px;height:120px;object-fit:cover;border-radius:8px"
-                     @error="onImgErr" />
+                <img :src="m.imageUrl || fallbackImg" alt="封面" class="me-3"
+                  style="width:160px;height:120px;object-fit:cover;border-radius:8px" @error="onImgErr" />
 
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between align-items-start">
@@ -65,15 +60,14 @@
 
                   <div class="d-flex gap-2 mb-2 justify-content-end">
                     <button class="btn btn-sm btn-outline" style="background-color: burlywood;"
-                            @click="toggleApplicants(m.missionId)">
+                      @click="toggleApplicants(m.missionId)">
                       查看申請者
                     </button>
                     <RouterLink class="btn btn-sm btn-outline-secondary"
-                                :to="{ name: 'missionDetail', params: { id: m.missionId } }">
+                      :to="{ name: 'missionDetail', params: { id: m.missionId } }">
                       查看任務
                     </RouterLink>
-                    <button class="btn btn-sm btn-outline-danger"
-                            @click="onDeleteMission(m.missionId)">刪除</button>
+                    <button class="btn btn-sm btn-outline-danger" @click="onDeleteMission(m.missionId)">刪除</button>
                   </div>
 
                   <!-- Applicants panel -->
@@ -83,19 +77,17 @@
                     </div>
                     <div v-else>
                       <div v-for="a in appsByMission(m.missionId)" :key="a.applicationId"
-                           class="d-flex align-items-center justify-content-between py-1 border-bottom small">
+                        class="d-flex align-items-center justify-content-between py-1 border-bottom small">
                         <div>
                           <span class="badge me-2" :class="statusClass(a.status)">{{ statusText(a.status) }}</span>
                           <strong>{{ a.applicantName }}</strong>
                           電話：{{ a.contactPhone || '' }}　申請時間：{{ fmt(a.applyTime) }}
                         </div>
                         <div class="d-flex gap-2">
-                          <button class="btn btn-sm btn-success"
-                                  :disabled="a.status !== 'pending'"
-                                  @click="ownerDecision(a.applicationId, 'accepted', m.missionId)">同意</button>
-                          <button class="btn btn-sm btn-outline-danger"
-                                  :disabled="a.status !== 'pending'"
-                                  @click="ownerDecision(a.applicationId, 'rejected', m.missionId)">拒絕</button>
+                          <button class="btn btn-sm btn-success" :disabled="a.status !== 'pending'"
+                            @click="ownerDecision(a.applicationId, 'accepted', m.missionId)">同意</button>
+                          <button class="btn btn-sm btn-outline-danger" :disabled="a.status !== 'pending'"
+                            @click="ownerDecision(a.applicationId, 'rejected', m.missionId)">拒絕</button>
                         </div>
                       </div>
                     </div>
@@ -125,11 +117,11 @@
               </div>
               <div class="d-flex gap-2 justify-content-end">
                 <RouterLink class="btn btn-sm btn-outline-secondary"
-                            :to="{ name: 'missionDetail', params: { id: app.missionId } }">
+                  :to="{ name: 'missionDetail', params: { id: app.missionId } }">
                   查看任務
                 </RouterLink>
-                <button v-if="app.status==='pending'" class="btn btn-sm text-white" style="background-color:rgb(219,120,120)"
-                        @click="onCancel(app.applicationId)">取消申請</button>
+                <button v-if="app.status === 'pending'" class="btn btn-sm text-white"
+                  style="background-color:rgb(219,120,120)" @click="onCancel(app.applicationId)">取消申請</button>
               </div>
             </div>
           </div>
@@ -155,7 +147,7 @@ const auth = computed(() => ({
   uid: userStore.userId
 }))
 
-function currentUserId() { 
+function currentUserId() {
   return auth.value.uid || null
 }
 
@@ -180,44 +172,44 @@ onMounted(async () => {
     error.value = '請先登入才能查看任務控制台'
     return
   }
-  
+
   await loadAll()
 })
 
-async function loadAll(){
+async function loadAll() {
   loading.value = true
   error.value = ''
   const uid = currentUserId()
-  
+
   if (!uid) {
     error.value = '無法取得用戶資訊，請重新登入'
     loading.value = false
     return
   }
-  
+
   try {
     console.log('🚀 開始載入任務控制台資料，用戶 ID:', uid)
-    
+
     // ✅ 使用 http axios 實例，會自動帶 JWT token
     const [m, o, a] = await Promise.all([
       http.get(`/api/owners/${uid}/missions`),
       http.get(`/api/applications/me/owner`, { params: { userId: uid } }),
       http.get(`/api/applications/me/applicant`, { params: { userId: uid } }),
     ])
-    
+
     allMissions.value = Array.isArray(m.data) ? m.data : []
-    ownerApps.value   = Array.isArray(o.data) ? o.data : []
-    myApplied.value   = Array.isArray(a.data) ? a.data : []
-    
+    ownerApps.value = Array.isArray(o.data) ? o.data : []
+    myApplied.value = Array.isArray(a.data) ? a.data : []
+
     console.log('✅ 任務控制台資料載入完成:', {
       myMissions: allMissions.value.length,
       receivedApps: ownerApps.value.length,
       myApps: myApplied.value.length
     })
-    
-  } catch(e) {
+
+  } catch (e) {
     console.error('💥 載入任務控制台失敗:', e)
-    
+
     if (e.response?.status === 401) {
       error.value = '認證已過期，請重新登入'
       localStorage.removeItem('auth')
@@ -234,61 +226,61 @@ async function loadAll(){
 
 // 對應 getOngoing / getAll / getApplied
 const ongoingMissions = computed(() => allMissions.value.filter(m => toInt(m.pendingCount) > 0 && !toBool(m.hasAccepted)))
-const listToRender = computed(() => activeTab.value==='ongoing' ? ongoingMissions.value : allMissions.value)
+const listToRender = computed(() => activeTab.value === 'ongoing' ? ongoingMissions.value : allMissions.value)
 
 // 小工具（保持與原實作一致）
-function tagLine(tags){ return Array.isArray(tags) && tags.length ? tags.map(t=>`#${t}`).join(' ') : '無標籤' }
-function toInt(n){ return Number.isFinite(+n) ? +n : 0 }
-function toBool(v){ return String(v)==='true' || v===true || v===1 }
-function fmt(s){ 
-  if(!s) return ''
+function tagLine(tags) { return Array.isArray(tags) && tags.length ? tags.map(t => `#${t}`).join(' ') : '無標籤' }
+function toInt(n) { return Number.isFinite(+n) ? +n : 0 }
+function toBool(v) { return String(v) === 'true' || v === true || v === 1 }
+function fmt(s) {
+  if (!s) return ''
   try {
-    const d = new Date(String(s).replace(' ','T'))
-    const pad=n=>String(n).padStart(2,'0')
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}` 
+    const d = new Date(String(s).replace(' ', 'T'))
+    const pad = n => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
   } catch (err) {
     console.error('💥 時間格式化失敗:', err, s)
     return '時間格式錯誤'
   }
 }
-function onImgErr(e){ e.target.src = fallbackImg }
-function badgeClass(m){ return toBool(m.hasAccepted) ? 'bg-success' : (toInt(m.pendingCount)>0 ? 'bg-warning' : 'bg-secondary') }
-function badgeText(m){ return toBool(m.hasAccepted) ? '已配對' : (toInt(m.pendingCount)>0 ? '待審中' : '未有申請') }
+function onImgErr(e) { e.target.src = fallbackImg }
+function badgeClass(m) { return toBool(m.hasAccepted) ? 'bg-success' : (toInt(m.pendingCount) > 0 ? 'bg-warning' : 'bg-secondary') }
+function badgeText(m) { return toBool(m.hasAccepted) ? '已配對' : (toInt(m.pendingCount) > 0 ? '待審中' : '未有申請') }
 
 // 申請者面板
-function toggleApplicants(mid){
+function toggleApplicants(mid) {
   const s = new Set(openSet.value)
   if (s.has(mid)) s.delete(mid); else s.add(mid)
   openSet.value = s
 }
-function isApplicantsOpen(mid){ return openSet.value.has(mid) }
-function appsByMission(mid){ return ownerApps.value.filter(a => String(a.missionId) === String(mid)) }
+function isApplicantsOpen(mid) { return openSet.value.has(mid) }
+function appsByMission(mid) { return ownerApps.value.filter(a => String(a.missionId) === String(mid)) }
 
 // 操作：刪除任務
-async function onDeleteMission(mid){
-  if(!confirm('確定刪除此任務？此動作無法復原')) return
+async function onDeleteMission(mid) {
+  if (!confirm('確定刪除此任務？此動作無法復原')) return
   const uid = currentUserId()
-  
+
   if (!uid) {
     alert('❌ 無法取得用戶資訊')
     return
   }
-  
+
   try {
     console.log('🚀 開始刪除任務:', mid)
-    
+
     // ✅ 使用 http axios 實例，會自動帶 JWT token
     await http.delete(`/api/missions/${mid}`, { params: { posterId: uid } })
-    
+
     allMissions.value = allMissions.value.filter(x => String(x.missionId) !== String(mid))
-    ownerApps.value   = ownerApps.value.filter(x => String(x.missionId) !== String(mid))
-    
+    ownerApps.value = ownerApps.value.filter(x => String(x.missionId) !== String(mid))
+
     console.log('✅ 任務刪除成功')
     alert('✅ 任務已刪除')
-    
-  } catch(e) {
+
+  } catch (e) {
     console.error('💥 刪除任務失敗:', e)
-    
+
     if (e.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
@@ -304,52 +296,52 @@ async function onDeleteMission(mid){
 }
 
 // 操作：同意/拒絕申請（對應 ownerDecision）
-async function ownerDecision(appId, action, missionId){
+async function ownerDecision(appId, action, missionId) {
   const actionText = action === 'accepted' ? '同意' : '拒絕'
-  if(!confirm(`確定${actionText}此申請？`)) return
-  
+  if (!confirm(`確定${actionText}此申請？`)) return
+
   const uid = currentUserId()
-  
+
   if (!uid) {
     alert('❌ 無法取得用戶資訊')
     return
   }
-  
+
   try {
     console.log('🚀 開始處理申請:', { appId, action, missionId })
-    
+
     // ✅ 使用 http axios 實例，會自動帶 JWT token
-    await http.patch(`/api/applications/${appId}/status`, null, { 
-      params: { ownerId: uid, status: action } 
+    await http.patch(`/api/applications/${appId}/status`, null, {
+      params: { ownerId: uid, status: action }
     })
 
     // 更新 ownerApps 狀態
-    ownerApps.value = ownerApps.value.map(a => 
+    ownerApps.value = ownerApps.value.map(a =>
       a.applicationId === +appId ? { ...a, status: action } : a
     )
 
-    if(action === 'accepted'){
+    if (action === 'accepted') {
       // 標記任務為已配對
-      allMissions.value = allMissions.value.map(m => 
-        String(m.missionId) === String(missionId) 
-          ? { ...m, hasAccepted: true, pendingCount: 0 } 
+      allMissions.value = allMissions.value.map(m =>
+        String(m.missionId) === String(missionId)
+          ? { ...m, hasAccepted: true, pendingCount: 0 }
           : m
       )
     } else {
       // 拒絕則 pendingCount -1
-      allMissions.value = allMissions.value.map(m => 
-        String(m.missionId) === String(missionId) 
-          ? { ...m, pendingCount: Math.max(0, toInt(m.pendingCount) - 1) } 
+      allMissions.value = allMissions.value.map(m =>
+        String(m.missionId) === String(missionId)
+          ? { ...m, pendingCount: Math.max(0, toInt(m.pendingCount) - 1) }
           : m
       )
     }
-    
+
     console.log('✅ 申請處理成功')
     alert(`✅ 已${actionText}申請`)
-    
-  } catch(e) {
+
+  } catch (e) {
     console.error('💥 處理申請失敗:', e)
-    
+
     if (e.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
@@ -365,31 +357,31 @@ async function ownerDecision(appId, action, missionId){
 }
 
 // 操作：取消我送出的申請
-async function onCancel(appId){
-  if(!confirm('確定取消這筆申請？')) return
+async function onCancel(appId) {
+  if (!confirm('確定取消這筆申請？')) return
   const uid = currentUserId()
-  
+
   if (!uid) {
     alert('❌ 無法取得用戶資訊')
     return
   }
-  
+
   try {
     console.log('🚀 開始取消申請:', appId)
-    
+
     // ✅ 使用 http axios 實例，會自動帶 JWT token
-    await http.delete(`/api/applications/${appId}`, { 
-      params: { applicantId: uid } 
+    await http.delete(`/api/applications/${appId}`, {
+      params: { applicantId: uid }
     })
-    
+
     myApplied.value = myApplied.value.filter(x => x.applicationId !== appId)
-    
+
     console.log('✅ 申請取消成功')
     alert('✅ 申請已取消')
-    
-  } catch(e) {
+
+  } catch (e) {
     console.error('💥 取消申請失敗:', e)
-    
+
     if (e.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
@@ -405,16 +397,16 @@ async function onCancel(appId){
 }
 
 // 狀態徽章工具（文字/樣式）
-function statusText(s){ 
-  if(s==='accepted') return '同意'
-  if(s==='pending') return '等待對方回覆'
-  if(s==='rejected') return '已拒絕'
+function statusText(s) {
+  if (s === 'accepted') return '同意'
+  if (s === 'pending') return '等待對方回覆'
+  if (s === 'rejected') return '已拒絕'
   return '已取消'
 }
-function statusClass(s){ 
-  if(s==='accepted') return 'bg-success'
-  if(s==='pending') return 'bg-warning'
-  if(s==='rejected') return 'bg-danger'
+function statusClass(s) {
+  if (s === 'accepted') return 'bg-success'
+  if (s === 'pending') return 'bg-warning'
+  if (s === 'rejected') return 'bg-danger'
   return 'bg-secondary'
 }
 </script>

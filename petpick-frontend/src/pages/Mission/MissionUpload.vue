@@ -351,7 +351,7 @@ async function onSubmit() {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     
-    console.log('✅ 上傳成功:', response.data)
+    console.log('✅ 上傳成功:')
     alert('✅ 上傳成功')
     
     // 可視需要清空表單或導向其他頁面
