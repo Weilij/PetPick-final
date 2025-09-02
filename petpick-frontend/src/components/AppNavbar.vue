@@ -17,19 +17,20 @@
           <ul class="navbar-nav mb-2 mb-lg-0">
             <!-- dropdown -->
             <li class="nav-item dropdown">
-              <button
-                class="nav-link btn btn-login m-1 dropdown-toggle"
-                id="adoptDropdown"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                type="button"
-              >
+              <button class="nav-link btn btn-login m-1 dropdown-toggle" id="adoptDropdown" data-bs-toggle="dropdown"
+                aria-expanded="false" type="button">
                 尋找領養
               </button>
               <ul class="dropdown-menu" aria-labelledby="adoptDropdown">
-                <li><RouterLink class="dropdown-item" to="/gov/list">公立認養</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/adopt/list">領養認養</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/post/adopt">刊登送養</RouterLink></li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/gov/list">公立認養</RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/adopt/list">領養認養</RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/post/adopt">刊登送養</RouterLink>
+                </li>
                 <!-- <li><RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink></li> -->
               </ul>
             </li>
@@ -44,53 +45,43 @@
           <div class="d-flex align-items-center gap-1 ms-lg-auto">
 
             <template v-if="user.isLogin">
-              <RouterLink
-                id="chatBubbleBtn"
-                class="btn btn-material position-relative"
-                to="/chat"
-                aria-label="聊天室"
-                title="聊天室"
-              >
+              <RouterLink id="chatBubbleBtn" class="btn btn-material position-relative" to="/chat" aria-label="聊天室"
+                title="聊天室">
                 <span id="chatBubbleBadge" class="material-icons">chat_bubble_outline</span>
                 <span id="chatBubbleBadge-unread" class="material-icons d-none">mark_chat_unread</span>
               </RouterLink>
 
               <RouterLink class="btn btn-material position-relative" to="/cart" aria-label="購物車" title="購物車">
                 <span class="material-icons">shopping_cart</span>
-                <span
-                  v-if="cart.itemsCount > 0"
+                <span v-if="cart.itemsCount > 0"
                   class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill"
-                  style="min-width:20px;"
-                >{{ cart.itemsCount }}</span>
+                  style="min-width:20px;">{{ cart.itemsCount }}</span>
               </RouterLink>
             </template>
-            
+
             <div class="dropdown d-inline-block">
-              <button
-                v-if="user.isLogin"
-                ref="accountBtnRef"
-                class="btn btn-material d-flex align-items-center gap-1"
-                type="button"
-                aria-label="帳號選單"
-                data-bs-toggle="dropdown"
-              >
+              <button v-if="user.isLogin" ref="accountBtnRef" class="btn btn-material d-flex align-items-center gap-1"
+                type="button" aria-label="帳號選單" data-bs-toggle="dropdown">
                 <span class="d-none d-sm-inline text-muted small">Hi, {{ user.username }}</span>
               </button>
-              <RouterLink
-                v-else
-                class="btn btn-material d-flex align-items-center gap-1"
-                to="/login"
-                aria-label="登入"
-                title="登入"
-              >
+              <RouterLink v-else class="btn btn-material d-flex align-items-center gap-1" to="/login" aria-label="登入"
+                title="登入">
                 <span class="material-icons">account_circle</span>
               </RouterLink>
 
               <ul v-show="user.isLogin" class="dropdown-menu dropdown-menu-end shadow">
-                <li><RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/shop/commodity">我的訂單</RouterLink></li>
-                <li><RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink></li>
-                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/shop/commodity">我的訂單</RouterLink>
+                </li>
+                <li>
+                  <RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink>
+                </li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
                 <li><button class="dropdown-item text-danger" @click="logout">登出</button></li>
               </ul>
             </div>
@@ -106,6 +97,7 @@ import { onMounted, onUnmounted, watch, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
+import Realtime from '@/common/realtime'
 import axios from '@/utils/http'
 import { Dropdown } from 'bootstrap'
 
@@ -135,8 +127,7 @@ function startRealtimeIfReady() {
 }
 
 onMounted(() => {
-  user.load() // <--- 修正處：在這裡呼叫 load()
-  
+
   // 掛載時拉一次購物車數量
   if (user.userId) cart.refresh(user.userId)
 
@@ -171,6 +162,7 @@ watch(
     }
     if (loggedIn && accountBtnRef.value) {
       dd = Dropdown.getOrCreateInstance(accountBtnRef.value, { autoClose: true })
+      startRealtimeIfReady()
     }
   },
   { immediate: true }
@@ -189,9 +181,9 @@ onUnmounted(() => {
 async function logout() {
   try {
     await axios.post('/logout')
-  } catch {}
+  } catch { }
   user.logout() // <--- 修正處：呼叫 user store 裡的 logout
-  
+
   cart.reset?.()
 
   router.replace({ path: '/login', query: { redirect: route.fullPath } })

@@ -2,67 +2,57 @@ import { defineStore } from 'pinia'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
-    userId: null,          // 改為 null，避免預設值干擾
-    username: '',          
-    token: '',             
-    role: '',              // ✅ 添加角色欄位
+    userId: null,
+    username: '',
+    token: '',
+    role: '',
   }),
 
   getters: {
-    isLogin: (state) => !!state.token,
-    isAdmin: (state) => state.role === 'ADMIN',  // ✅ 方便檢查管理員身份
+    // ✅ 有 userId 或 token 其一即可判定為登入
+    isLogin: (s) => !!s.userId || !!s.token,
+    isAdmin: (s) => s.role === 'ADMIN',
   },
 
   actions: {
-    // ✅ 修改設定用戶資料的方法，配合後端回應格式
     setUser({ userId, username, token, role }) {
-      this.userId = userId
-      this.username = username
-      this.token = token
-      this.role = role || ''  // ✅ 設定角色，如果沒有則為空字串
-      localStorage.setItem('auth', JSON.stringify({ userId, username, token, role }))
+      this.userId = userId ?? null
+      this.username = username ?? ''
+      this.token = token ?? ''
+      this.role = role ?? ''
+      localStorage.setItem('auth', JSON.stringify({
+        userId: this.userId, username: this.username, token: this.token, role: this.role
+      }))
     },
 
-    // ✅ 新增：從後端認證回應設定用戶資料
-    setUserFromAuth(authData) {
-      const userId = authData.uid || authData.userId || authData.id
-      const username = authData.username || authData.principal || ''
-      const role = authData.role || ''
-      const token = this.token || '' // 保持現有 token
-      
-      this.userId = userId
-      this.username = username
-      this.role = role
-      this.token = token
-      
-      localStorage.setItem('auth', JSON.stringify({ userId, username, token, role }))
+    setUserFromAuth(authData = {}) {
+      const userId = authData.uid ?? authData.userId ?? authData.id ?? null
+      const username = authData.username ?? authData.principal ?? ''
+      const role = authData.role ?? ''
+      // 保留既有 token（若你是用 cookie 登入可不需要）
+      this.setUser({ userId, username, token: this.token, role })
     },
 
-    // ✅ 修改載入方法，包含角色資料
     load() {
       const raw = localStorage.getItem('auth')
       if (!raw) return
-
       try {
         const { userId, username, token, role } = JSON.parse(raw)
-        // 確保資料有正確格式
-        if (userId && username && token) {
-          this.userId = userId
-          this.username = username
-          this.token = token
-          this.role = role // ✅ 載入角色，如果沒有則為空字串
+        // ✅ 只要有 userId 或 token 其一就還原
+        if (userId != null || (token && token.length)) {
+          this.userId = userId ?? null
+          this.username = username ?? ''
+          this.token = token ?? ''
+          this.role = role ?? ''
         }
-      } catch (error) {
-        console.error('無法解析 localStorage 中的用戶資料', error)
+      } catch {
         this.$reset()
       }
     },
 
-    // 登出，清除資料
     logout() {
       this.$reset()
       localStorage.removeItem('auth')
     }
   }
 })
-
