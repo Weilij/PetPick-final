@@ -220,17 +220,20 @@ async function onApply() {
   if (!m.value?.missionId) return
   if (!auth.value.loggedIn) {
     alert('❌ 請先登入才能申請任務')
-    router.push('/login')
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   if (!confirm('確認送出申請？')) return
   
   applying.value = true
   try {
-    console.log('🚀 開始申請任務:', m.value.missionId)
-    
+// ✅ 使用 http axios 實例（自帶 token）
+    const res = await http.post('/api/applications', {
+      missionId: m.value.missionId,
+      applicantId: auth.value.uid
+    })    
     // ✅ 使用 http axios 實例，會自動帶 JWT token
-    const response = await http.post('/api/applications', {
+    const response = await http.post('/api/missionapplications', {
       missionId: m.value.missionId,
       applicantId: auth.value.uid
     })
@@ -239,6 +242,21 @@ async function onApply() {
     alert('✅ 申請成功！')
     
     // 可以導向聊天頁面或其他後續流程
+       // 若後端有回傳 conversationId，優先用它
+    const conversationId =
+      res?.data?.conversationId ?? res?.data?.convId ?? res?.data?.id
+
+    alert('✅ 申請成功！將為你打開聊天室')
+
+    if (conversationId) {
+      router.push({ name: 'chat', query: { conversationId } })
+    } else {
+      // 讓 Chat.vue 以 missionId + applicantId 自動建立/打開會話
+      router.push({
+        name: 'chat',
+        query: { missionId: m.value.missionId, applicantId: auth.value.uid }
+      })
+    }
     
   } catch (e) {
     console.error('💥 申請失敗:', e)
@@ -246,7 +264,7 @@ async function onApply() {
     if (e.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
-      router.push('/login')
+      router.push({ name: 'login', query: { redirect: route.fullPath } })
     } else if (e.response?.status === 409) {
       alert('你已申請過此任務或任務已配對完成')
     } else {
