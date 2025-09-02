@@ -193,7 +193,7 @@ onMounted(async () => {
     const uid = auth.value.loggedIn ? auth.value.uid : null
     await missionStore.fetchList(uid)
     
-    ALL.value = Array.isArray(missionStore.list) ? missionStore.list : []
+    ALL.value = Array.isArray(missionStore.list) ? missionStore.list.filter(m => isActiveMission(m)) : []
     VIEW.value = [...ALL.value]
     hydrateFilters(ALL.value)
     
