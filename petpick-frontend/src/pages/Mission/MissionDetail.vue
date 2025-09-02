@@ -224,7 +224,7 @@ async function onApply() {
     return
   }
   if (!confirm('確認送出申請？')) return
-  
+
   applying.value = true
   try {
 // ✅ 使用 http axios 實例（自帶 token）
@@ -237,12 +237,8 @@ async function onApply() {
       missionId: m.value.missionId,
       applicantId: auth.value.uid
     })
-    
-    console.log('✅ 申請成功:', response.data)
-    alert('✅ 申請成功！')
-    
-    // 可以導向聊天頁面或其他後續流程
-       // 若後端有回傳 conversationId，優先用它
+
+    // 若後端有回傳 conversationId，優先用它
     const conversationId =
       res?.data?.conversationId ?? res?.data?.convId ?? res?.data?.id
 
@@ -257,10 +253,7 @@ async function onApply() {
         query: { missionId: m.value.missionId, applicantId: auth.value.uid }
       })
     }
-    
   } catch (e) {
-    console.error('💥 申請失敗:', e)
-    
     if (e.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
