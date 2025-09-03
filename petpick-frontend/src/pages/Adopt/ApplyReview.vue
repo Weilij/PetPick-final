@@ -165,6 +165,7 @@ const route = useRoute()
 const router = useRouter()
 
 // ---- 狀態 ----
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const fallback = '/images/no-image.jpg'
 
 const pageInfo = reactive({
@@ -304,10 +305,28 @@ function gotoPage(n) {
   load()
 }
 
-// 圖片挑選與錯誤處理
-function pickImg(post = {}) {
-  return post.image1 || post.image2 || post.image3 || fallback
+function imgUrl (path) {
+  if (!path) return fallback
+  if (/^https?:\/\//i.test(path)) return path               // 已是完整網址
+  const p = path.startsWith('/') ? path : '/' + path        // 相對 → 絕對
+  return API_BASE + p
 }
+
+function safeParseArray (v) {
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+
+// 卡片縮圖：支援 image1/2/3 + images(陣列/JSON字串)，並補完整網址
+function pickImg (post = {}) {
+  const candidates = [
+    post?.image1, post?.image2, post?.image3,
+    ...(Array.isArray(post?.images) ? post.images : []),
+    ...(typeof post?.images === 'string' ? safeParseArray(post.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  return candidates.length ? imgUrl(candidates[0]) : fallback
+}
+
 function onImgError(e) {
   e.target.src = fallback
 }
@@ -331,9 +350,14 @@ const modalLoading = ref(false)
 const modalData = ref(null)
 const modalPost = computed(() => modalData.value?.post || {})
 const modalImages = computed(() => {
-  const p = modalPost.value
-  const list = [p.image1, p.image2, p.image3].filter(u => !!u && String(u).trim())
-  return list.length ? list : [fallback]
+  const p = modalPost.value || {}
+  const list = [
+    p.image1, p.image2, p.image3,
+    ...(Array.isArray(p.images) ? p.images : []),
+    ...(typeof p.images === 'string' ? safeParseArray(p.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  return list.length ? list.map(imgUrl) : [fallback]
 })
 const modalTitle = computed(() => {
   const s = modalData.value?.status || 'pending'

@@ -22,7 +22,7 @@
             class="nav-link"
             :class="{ active: active === 'Admin' }"
             href="/post-review"
-          >認養文管理</a>
+          >刊登審核管理</a>
         </li>
          <li class="nav-item">
           <a
