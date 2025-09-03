@@ -604,4 +604,35 @@ watch(() => auth.value.loggedIn, (loggedIn) => {
   background-clip: padding-box;
 }
 
+/* 條款 checkbox 走品牌色 */
+.post-adopt-page .terms-check .form-check-input{
+  /* 主要：一行就把勾選顏色改掉（Chrome/Edge/Firefox/Safari 新版都支援） */
+  accent-color: var(--brand);
+
+  /* 小視覺微調（可留可拿掉） */
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  border: 2px solid var(--brand);
+  box-shadow: none;
+}
+
+/* 勾選狀態下，讓邊框/底色一致 */
+.post-adopt-page .terms-check .form-check-input:checked{
+  background-color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* focus 時走品牌陰影 */
+.post-adopt-page .terms-check .form-check-input:focus{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 .2rem rgba(209,159,114,.25);
+}
+
+/* 驗證沒勾選時，維持紅色提示樣式 */
+.post-adopt-page .terms-check .form-check-input.is-invalid{
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 .2rem rgba(220,53,69,.15) !important;
+}
+
 </style>

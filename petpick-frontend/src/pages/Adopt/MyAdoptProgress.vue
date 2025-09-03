@@ -122,6 +122,14 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import http from '@/utils/http'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const imgUrl = (path) => {
+  if (!path) return '/images/no-image.jpg'
+  if (/^https?:\/\//i.test(path)) return path
+  const p = path.startsWith('/') ? path : '/' + path
+  return API_BASE + p
+}
+
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -144,8 +152,22 @@ const statusParam = computed(() => (route.query.status === 'approved' ? 'approve
 const stepActive = computed(() => (statusParam.value === 'approved' ? 3 : 2))
 
 // === UI / 顯示 ===
+function safeParseArray(v) {
+  try {
+    const arr = JSON.parse(v)
+    return Array.isArray(arr) ? arr : []
+  } catch { return [] }
+}
+
 function firstImg(p) {
-  return p.image1 || p.image2 || p.image3 || '/images/no-image.jpg'
+  const candidates = [
+    p?.image1, p?.image2, p?.image3,
+    ...(Array.isArray(p?.images) ? p.images : []),
+    ...(typeof p?.images === 'string' ? safeParseArray(p.images) : []),
+  ].filter(s => typeof s === 'string' && s.trim())
+
+  const first = candidates[0]
+  return first ? imgUrl(first) : '/images/no-image.jpg'
 }
 function badge(s) {
   if (s === 'approved') return '<span class="badge text-bg-success">刊登成功</span>'
