@@ -24,10 +24,10 @@ export default defineConfig({
 const buildUrl = () => {
   // ✅ 如果有設置 proxy，直接使用相對路徑
   const url = new URL('/api/adopts', window.location.origin)
-  
+
   url.searchParams.set('page', page.number)
   url.searchParams.set('size', pageSize)
-  
+
   if (filters.city) url.searchParams.set('city', filters.city)
   if (filters.district) url.searchParams.set('district', filters.district)
   if (filters.species) url.searchParams.set('species', filters.species)
@@ -35,6 +35,6 @@ const buildUrl = () => {
   if (filters.age) url.searchParams.set('age', filters.age)
   if (filters.sourceType) url.searchParams.set('sourceType', filters.sourceType)
   if (filters.keyword) url.searchParams.set('q', filters.keyword)
-  
+
   return url
 }
