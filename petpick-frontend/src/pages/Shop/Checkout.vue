@@ -495,11 +495,12 @@ async function handleSubmit() {
 
     // 1) 建立訂單
     const order = await postJson('/api/orders/checkout', {
-      addr: _addr,
-      receiverZip: _zip || null,
-      receiverName: _name,
-      receiverPhone: _phone,
-      shippingType: _delivery
+     userId: userId, // ✅ 必帶 userId，否則後端會是 null
+ addr: _addr,
+receiverZip: _zip || null,
+receiverName: _name,
+receiverPhone: _phone,
+shippingType: _delivery
     })
     
     const orderId = order?.orderId
@@ -560,7 +561,7 @@ async function handleSubmit() {
     }
 
     // 理論上不會進到；保底直接當成功頁跳轉
-    router.push({ path: '/checkout/success', query: { orderId: String(createdOrderId) } })
+    router.push({ path: '/success', query: { orderId: String(createdOrderId) } })
     
   } catch (err) {
     console.error('❌ 結帳流程錯誤:', err)

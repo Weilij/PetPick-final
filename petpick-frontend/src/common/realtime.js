@@ -17,7 +17,7 @@ function ensureConn(onReady) {
   if (S.connecting) return setTimeout(() => ensureConn(onReady), 200)
   S.connecting = true
 
-  const sock = new SockJS('/ws')
+const sock = new SockJS('http://localhost:8080/ws')
   const stomp = Stomp.over(sock)
   stomp.debug = null
 
