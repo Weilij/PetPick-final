@@ -32,6 +32,7 @@ const OrderDetail = () => import('@/pages/Shop/OrderDetail.vue')
 const Fail = () => import('@/pages/Shop/Fail.vue')
 const AdminOrders = () => import('@/pages/Shop/AdminOrders.vue')
 const AdminProducts = () => import('@/pages/Shop/AdminProducts.vue')
+
 //Account
 
 
@@ -77,6 +78,7 @@ const router = createRouter({
     { path: '/fail', name: 'fail', component: Fail },
     { path: '/adminOrders', name: 'adminOrders', component: AdminOrders, meta: { hideNavbar: true, hideFooter: true } },
     { path: '/adminProducts', name: 'adminProducts', component: AdminProducts, meta: { hideNavbar: true, hideFooter: true } },
+
     //Account
     // { path: '/login', name: 'login', component: () => import('@/pages/Auth/Login.vue') },
 

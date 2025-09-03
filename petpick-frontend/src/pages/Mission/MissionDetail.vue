@@ -227,27 +227,21 @@ async function onApply() {
 
   applying.value = true
   try {
-// ✅ 使用 http axios 實例（自帶 token）
-    const res = await http.post('/api/applications', {
-      missionId: m.value.missionId,
-      applicantId: auth.value.uid
-    })    
-    // ✅ 使用 http axios 實例，會自動帶 JWT token
-    const response = await http.post('/api/missionapplications', {
-      missionId: m.value.missionId,
-      applicantId: auth.value.uid
+    // ✅ 正確的 API 呼叫方式
+    const res = await http.post('/api/missionapplications', null, {
+      params: {
+        missionId: m.value.missionId,
+        applicantId: auth.value.uid
+      }
     })
-
-    // 若後端有回傳 conversationId，優先用它
-    const conversationId =
-      res?.data?.conversationId ?? res?.data?.convId ?? res?.data?.id
 
     alert('✅ 申請成功！將為你打開聊天室')
 
+    // 這裡依你的需求，可以決定是否要立即導向聊天室
+    const conversationId = res?.data?.conversationId ?? res?.data?.id
     if (conversationId) {
       router.push({ name: 'chat', query: { conversationId } })
     } else {
-      // 讓 Chat.vue 以 missionId + applicantId 自動建立/打開會話
       router.push({
         name: 'chat',
         query: { missionId: m.value.missionId, applicantId: auth.value.uid }

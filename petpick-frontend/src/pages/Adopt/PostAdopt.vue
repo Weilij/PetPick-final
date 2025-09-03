@@ -254,7 +254,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import http from '@/utils/http'
@@ -289,6 +289,46 @@ const form = reactive({
   requireContract: 'false',
   requireFollowup: 'false'
 })
+
+// ==== 自動帶入登入者資訊（先從 store，沒有再打 API）====
+const prefilled = ref(false)
+
+// 先從 Pinia store 帶（依你 store 的欄位名稱改一下）
+function prefillFromStore () {
+  if (!auth.value.loggedIn) return
+  const n = userStore.username || userStore.name || ''
+  const p = userStore.phonenumber || userStore.phone || userStore.mobile || ''
+
+  if (!form.contactName && n)   form.contactName  = n
+  if (!form.contactPhone && p)  form.contactPhone = p
+
+  // ✅ 兩個都有才標記完成，避免擋掉 API 補值
+  prefilled.value = !!(form.contactName && form.contactPhone)
+}
+
+// 如果 store 沒資料，就向後端拿
+async function prefillFromApi () {
+  if (!auth.value.loggedIn) return
+  // ✅ 只有缺資料才打
+  const need = !form.contactName || !form.contactPhone || !form.contactLine
+  if (!need) return
+
+  try {
+    const { data } = await http.get('/api/user/me')  // 你後端是 /api/user/me
+    const n = data?.username || data?.name || ''
+    const p = data?.phonenumber || data?.phone || data?.mobile || ''
+    const l = data?.lineId || data?.line || ''
+
+    if (!form.contactName && n)   form.contactName  = n
+    if (!form.contactPhone && p)  form.contactPhone = p
+    if (!form.contactLine && l)   form.contactLine  = l
+
+    // 這行可有可無：給你看 API 回了什麼
+    // console.log('me:', data)
+  } catch (e) {
+    console.warn('載入會員資料失敗（可忽略）', e)
+  }
+}
 
 // ===== 行政區 =====
 const areas = ref([]) // [{name, districts:[]}]
@@ -329,8 +369,8 @@ async function doUpload(e){
     console.log('🚀 開始上傳圖片到 slot:', uploadSlot.value)
     
     // ✅ 使用 http axios 實例，會自動帶 JWT token
-    const response = await http.post('/api/upload', fd, { 
-      headers: { 'Content-Type': 'multipart/form-data' }
+    const response = await http.post('/adopts/uploads', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
     })
     
     const urls = response.data?.urls || []
@@ -427,13 +467,31 @@ async function onSubmit(){
   }
 }
 
+watch(() => auth.value.loggedIn, (loggedIn) => {
+  if (loggedIn) {
+    prefillFromStore()
+    if (!prefilled.value) prefillFromApi()
+  }
+})
+
 // ===== 置頂按鈕 =====
 const showTop = ref(false)
 function toTop(){ window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
 onMounted(() => {
   loadAreas()
+  if (auth.value.loggedIn) {
+    prefillFromStore()
+    prefillFromApi()   // ❌ 不要用 if (!prefilled.value) 判斷了
+  }
   window.addEventListener('scroll', () => { showTop.value = window.scrollY > 200 })
+})
+
+watch(() => auth.value.loggedIn, (loggedIn) => {
+  if (loggedIn) {
+    prefillFromStore()
+    prefillFromApi()
+  }
 })
 </script>
 

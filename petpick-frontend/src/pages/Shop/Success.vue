@@ -46,6 +46,8 @@
 <script setup>
 import { computed, onMounted, watch, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import http from '@/utils/http'
+
 
 // 可選：若你的專案有 Pinia 的購物車 store，可啟用以下兩行，優先用 store 刷徽章
 // import { useCartStore } from '@/stores/cart'
@@ -129,26 +131,26 @@ async function fallbackFill() {
   }
 
   // B) 金額/時間：打訂單 API 補
-  if ((!amount.value || !payTime.value) && orderId.value) {
-    try {
-      const r = await fetch(`/api/orders/${encodeURIComponent(orderId.value)}`)
-      if (r.ok) {
-        const o = await r.json()
-        if (amount.value == null && o?.totalPrice != null) {
-          amount.value = Number(o.totalPrice)
-        }
-        const t = o?.paidAt || o?.createdAt
-        if (!payTime.value && t) {
-          payTime.value = fmtDT(t)
-        }
-        if (!paymentType.value && String(o?.status || '').toLowerCase() === 'paid') {
-          paymentType.value = '信用卡'
-        }
-      }
-    } catch {
-      /* ignore */
+  // B) 金額/時間：打訂單 API 補
+if ((!amount.value || !payTime.value) && orderId.value) {
+  try {
+    const r = await http.get(`/api/orders/${encodeURIComponent(orderId.value)}`)
+    const o = r.data
+    if (amount.value == null && o?.totalPrice != null) {
+      amount.value = Number(o.totalPrice)
     }
+    const t = o?.paidAt || o?.createdAt
+    if (!payTime.value && t) {
+      payTime.value = fmtDT(t)
+    }
+    if (!paymentType.value && String(o?.status || '').toLowerCase() === 'paid') {
+      paymentType.value = '信用卡'
+    }
+  } catch {
+    /* ignore */
   }
+}
+
 }
 
 // 複製功能
@@ -176,8 +178,8 @@ async function clearCartAndRefreshBadge() {
 
   async function tryDelete(url) {
     try {
-      const r = await fetch(url, { method: 'DELETE', headers: { ...DEMO_HEADERS } })
-      return r.ok
+      await http.delete(url, { headers: DEMO_HEADERS })
+      return true
     } catch { return false }
   }
   // 清空（新版 → 舊版 fallback）
@@ -189,8 +191,8 @@ async function clearCartAndRefreshBadge() {
     // 若你有 cartStore.refresh：
     // await cartStore.refresh(uid)
     // 若沒有 Pinia 或尚未掛載 Navbar，改回 DOM 版本：
-    const r = await fetch(`/api/cart/withProduct/${encodeURIComponent(uid)}`, { headers: { ...DEMO_HEADERS } })
-    const items = r.ok ? await r.json() : []
+    const r = await http.get(`/api/cart/withProduct/${encodeURIComponent(uid)}`, { headers: DEMO_HEADERS })
+    const items = r.data
     const badge = document.getElementById('cart-badge')
     if (badge) badge.textContent = String(Array.isArray(items) ? items.length : 0)
   } catch { /* ignore */ }

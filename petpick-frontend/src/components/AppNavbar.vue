@@ -73,8 +73,14 @@
                 <li>
                   <RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink>
                 </li>
+                 <li>
+                  <RouterLink class="dropdown-item" to="/my-adopt-progress">我的貼文</RouterLink>
+                </li>
+                 <li>
+                  <RouterLink class="dropdown-item" to="/my-apply">我的申請</RouterLink>
+                </li>
                 <li>
-                  <RouterLink class="dropdown-item" to="/shop/commodity">我的訂單</RouterLink>
+                  <RouterLink class="dropdown-item" to="/order">我的訂單</RouterLink>
                 </li>
                 <li>
                   <RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink>
