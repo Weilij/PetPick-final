@@ -304,7 +304,7 @@ async function onSubmit() {
   // 檢查認證狀態
   if (!auth.value.loggedIn) {
     alert('❌ 請先登入才能上傳任務')
-    sessionStorage.setItem('redirect', '/mission/upload')
+    sessionStorage.setItem('redirect', '/missions/upload')
     router.push('/login')
     return
   }
@@ -347,9 +347,8 @@ async function onSubmit() {
     console.log('🚀 開始上傳任務:', payload)
     
     // ✅ 使用 http axios 實例，會自動帶 JWT token
-    const response = await http.post('/api/missions/upload', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+     const response = await http.post('/api/missions/upload', fd)
+
     
     console.log('✅ 上傳成功:')
     alert('✅ 上傳成功')
