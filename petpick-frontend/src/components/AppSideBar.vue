@@ -31,6 +31,13 @@
             href="/apply-review"
           >認養申請管理</a>
         </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            :class="{ active: active === 'Admin' }"
+            href="/admin-report"
+          >領養回報管理</a>
+        </li>
       </ul>
     </div>
   </nav>

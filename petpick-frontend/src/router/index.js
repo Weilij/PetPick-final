@@ -39,6 +39,7 @@ const AdminProducts = () => import('@/pages/Shop/AdminProducts.vue')
 
 //Adopt
 const AdoptView = () => import('../pages/Adopt/AdoptView.vue')
+const AdminReport = () => import('@/pages/Adopt/AdminReport.vue')
 
 // Admin
 const AdminDashboard = () => import('../pages/Admin/AdminDashboard.vue')
@@ -92,6 +93,7 @@ const router = createRouter({
     { path: '/post-review', name: 'PostReview', component: () => import('@/pages/Adopt/PostReview.vue'), meta: { hideNavbar: true, hideFooter: true } },
     { path: '/apply-review', name: 'ApplyReview', component: () => import('@/pages/Adopt/ApplyReview.vue'), meta: { hideNavbar: true, hideFooter: true } },
     { path: '/adopt/report', name: 'AdoptReport', component: () => import('@/pages/Adopt/AdoptReport.vue') },
+    { path: '/admin/report', name: 'AdminReport', component: AdminReport, alias: ['/admin-report'], meta: { hideNavbar: true, hideFooter: true, requiresAuth: true, requiresRole: 'ADMIN', title: '回報管理 - PetPick' } },
     { path: '/adopt/view', name: 'AdoptView', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
     { path: '/adopt/:id', name: 'AdoptViewById', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
 
