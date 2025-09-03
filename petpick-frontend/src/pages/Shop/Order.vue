@@ -121,6 +121,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, Tooltip } from 'bootstrap'
 import { useCartStore } from '@/stores/cart' // 若你沒有 cart store，可移除相關段落
+import http from '@/utils/http'
 
 // ====== 狀態 ======
 const orders = ref([])
@@ -195,19 +196,19 @@ function cancelTooltip(status, logisticsStatus) {
 async function loadOrders() {
   loading.value = true
   try {
-    const r = await fetch(`/api/orders/user/${encodeURIComponent(userId)}`)
-    if (!r.ok) throw new Error(await r.text().catch(() => `HTTP ${r.status}`))
-    const list = await r.json()
+    const r = await http.get(`/api/orders/user/${encodeURIComponent(userId)}`)
+    const list = r.data
     orders.value = Array.isArray(list) ? list : []
     await nextTick()
     initTooltips()
   } catch (e) {
-    console.error(e)
+    console.error('❌ 載入訂單失敗:', e)
     orders.value = []
   } finally {
     loading.value = false
   }
 }
+
 
 // ====== Tooltip 初始化（每次 orders 變動都重掛）======
 function initTooltips() {
@@ -237,25 +238,23 @@ async function confirmCancel() {
   cancelBusy.value = true
   cancelError.value = ''
   try {
-    // 你若有「使用者端」API，改成 /api/orders/{id}/cancel
-    const r = await fetch(`/api/admin/orders/${encodeURIComponent(pending.value.id)}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: cancelReason.value })
+    // 使用 axios (http.post) 送出取消請求
+    const r = await http.post(`/api/admin/orders/${encodeURIComponent(pending.value.id)}/cancel`, {
+      reason: cancelReason.value
     })
-    if (!r.ok) throw new Error(await r.text().catch(() => `取消失敗 (${r.status})`))
 
-    // 更新本地列表狀態
+    // 成功後更新本地 orders 狀態
     const idx = orders.value.findIndex(x => String(oKey(x)) === String(pending.value.id))
     if (idx !== -1) orders.value[idx] = { ...orders.value[idx], status: 'CANCELLED' }
 
     cancelModalInst?.hide()
   } catch (e) {
-    cancelError.value = e?.message || '取消失敗，請稍後再試。'
+    cancelError.value = e?.response?.data || e?.message || '取消失敗，請稍後再試。'
   } finally {
     cancelBusy.value = false
   }
 }
+
 
 // ====== 回頂部 ======
 function onScroll() { showBackToTop.value = window.scrollY > 200 }
