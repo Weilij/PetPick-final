@@ -68,10 +68,10 @@
             <div class="card pet-card h-100">
               <div class="position-relative">
                 <img
-                  :src="(p.image1?.startsWith('/')) ? p.image1 : ('/' + p.image1) || '/images/no-image.jpg'"
+                  :src="imgUrl(p.image1)"
                   class="card-img-top"
                   alt="封面"
-                  @error="onImgError"
+                  @error="(e) => { e.target.onerror = null; e.target.src = '/images/no-image.jpg' }"
                 />
                 <span
                   v-if="p.pendingApplications && p.pendingApplications > 0"
@@ -166,8 +166,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+
+// ===== 圖片網址組合：把相對路徑補成 http://localhost:8080/... =====
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
+const imgUrl = (path) => {
+  // 沒值 → 用占位圖
+  if (!path) return '/images/no-image.jpg'               // ← 占位圖建議放在前端 public/images/no-image.jpg
+
+  // 已是完整 http(s) 連結，直接用
+  if (/^https?:\/\//i.test(path)) return path
+
+  // 其餘視為相對路徑（例如 /adopt/uploads/xxx.jpg 或 adopt/uploads/xxx.jpg）
+  const p = path.startsWith('/') ? path : '/' + path
+  return API_BASE + p                                     // 組成 http://localhost:8080/adopt/uploads/xxx.jpg
+}
+
 
 const pageSize = 12
 const loading = ref(false)
