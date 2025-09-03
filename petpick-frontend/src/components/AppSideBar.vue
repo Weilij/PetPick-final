@@ -17,6 +17,20 @@
             href="adminOrders"
           >訂單管理</a>
         </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            :class="{ active: active === 'Admin' }"
+            href="/post-review"
+          >認養文管理</a>
+        </li>
+         <li class="nav-item">
+          <a
+            class="nav-link"
+            :class="{ active: active === 'Admin' }"
+            href="/apply-review"
+          >認養申請管理</a>
+        </li>
       </ul>
     </div>
   </nav>

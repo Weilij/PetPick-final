@@ -1,20 +1,8 @@
 <template>
   <div class="container-fluid post-review-page">
     <div class="row">
-      <!-- 側邊欄 -->
-      <nav class="col-md-2 d-none d-md-block bg-light sidebar p-3">
-        <div class="position-sticky">
-          <h6 class="text-muted px-2 mb-3">後台選單</h6>
-          <ul class="nav flex-column gap-1">
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin">後台首頁</RouterLink></li>
-            <li class="nav-item"><a class="nav-link" href="/admin-products.html">商品管理</a></li>
-            <li class="nav-item"><a class="nav-link" href="/admin-orders.html">訂單管理</a></li>
-            <li class="nav-item"><a class="nav-link" href="/admin-users.html">會員管理</a></li>
-            <li class="nav-item"><RouterLink class="nav-link" :to="{ name:'PostReview' }">刊登審核</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" :to="{ name:'ApplyReview' }">申請審核</RouterLink></li>
-          </ul>
-        </div>
-      </nav>
+    <!-- 側邊選單 -->
+    <AdminSidebar active="Admin" />
 
       <!-- 主內容 -->
       <main class="col-md-10 ms-sm-auto px-md-4 py-4">
@@ -178,22 +166,24 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import AdminSidebar from '@/components/AppSideBar.vue'
+import http from '@/utils/http'   // ✅ 改成使用 http
 
 const route = useRoute()
 const router = useRouter()
 
-// ====== auth（如需強制管理員，可把 ENFORCE_ADMIN 改成 true） ======
+// ====== auth ======
 const ENFORCE_ADMIN = false
 async function checkAdmin () {
   try {
-    const r = await fetch('/api/auth/status', { credentials: 'include' })
-    if (!r.ok) return
-    const a = await r.json()
-    if (ENFORCE_ADMIN && (!a?.loggedIn || a?.role !== 'ADMIN')) {
+    const { data } = await http.get('/api/auth/status')
+    if (ENFORCE_ADMIN && (!data?.loggedIn || data?.role !== 'ADMIN')) {
       router.replace({ path: '/login', query: { redirect: route.fullPath } })
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 // ====== state & url ======
@@ -212,7 +202,7 @@ function syncUrl(push = false){
   if (state.q) q.q = state.q
   q.page = state.page
   q.size = state.size
-  const loc = { name: route.name, path: '/post-review', query: q }
+  const loc = { name: route.name, path: '/api/post-review', query: q }
   push ? router.push(loc) : router.replace(loc)
 }
 
@@ -239,9 +229,7 @@ function buildParams(){
 async function load(){
   loading.value = true
   try{
-    const r = await fetch(`/api/adopts?${buildParams()}`, { credentials: 'include' })
-    if (!r.ok) throw new Error('讀取失敗')
-    const data = await r.json()
+    const { data } = await http.get(`/api/adopts?${buildParams()}`)
     items.value = Array.isArray(data) ? data : (data.content || [])
     page.number = data.number ?? 0
     page.totalPages = data.totalPages ?? 0
@@ -309,9 +297,8 @@ async function openDetail(id){
   if (bsModal) bsModal.show()
 
   try{
-    const r = await fetch(`/api/adopts/${id}`, { credentials:'include' })
-    if (!r.ok) throw new Error('讀取失敗')
-    detail.value = await r.json()
+    const { data } = await http.get(`/api/adopts/${id}`)
+    detail.value = data
   }catch(e){
     console.error(e)
     detail.value = { title:'讀取失敗' }
@@ -322,23 +309,38 @@ async function openDetail(id){
 async function updateStatus(id, act, closeModal=false){
   let reason = ''
   if (act === 'rejected') reason = prompt('退件原因（可留空）') || ''
-  const ok = await fetch(`/api/posts/${id}/status?status=${act}&reason=${encodeURIComponent(reason)}`,
-                         { method:'PATCH', credentials:'include' }).then(r=>r.ok)
-  alert(ok ? '已更新' : '更新失敗')
-  if (ok){
-    if (closeModal && bsModal) bsModal.hide()
-    load()
+  try {
+    const { status } = await http.patch(`/api/posts/${id}/status`, null, {
+      params: { status: act, reason }
+    })
+    alert(status === 200 ? '已更新' : '更新失敗')
+    if (status === 200){
+      if (closeModal && bsModal) bsModal.hide()
+      load()
+    }
+  } catch {
+    alert('更新失敗')
   }
 }
 async function adminHold(id, hold){
-  const ok = await fetch(`/api/posts/${id}/hold?hold=${hold}`, { method:'PATCH', credentials:'include' }).then(r=>r.ok)
-  alert(ok ? '已更新' : '更新失敗')
-  if (ok) load()
+  try {
+    const { status } = await http.patch(`/api/posts/${id}/hold`, null, {
+      params: { hold }
+    })
+    alert(status === 200 ? '已更新' : '更新失敗')
+    if (status === 200) load()
+  } catch {
+    alert('更新失敗')
+  }
 }
 async function adminClose(id){
-  const ok = await fetch(`/api/posts/${id}/close`, { method:'PATCH', credentials:'include' }).then(r=>r.ok)
-  alert(ok ? '已關閉' : '關閉失敗')
-  if (ok) load()
+  try {
+    const { status } = await http.patch(`/api/posts/${id}/close`)
+    alert(status === 200 ? '已關閉' : '關閉失敗')
+    if (status === 200) load()
+  } catch {
+    alert('關閉失敗')
+  }
 }
 
 // ====== boot ======
@@ -348,6 +350,7 @@ onMounted(async () => {
   load()
 })
 </script>
+
 
 <style scoped>
 .sidebar { min-height: 100vh; border-right: 1px solid #eee; }
