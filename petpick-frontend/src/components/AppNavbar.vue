@@ -127,6 +127,8 @@ function startRealtimeIfReady() {
 }
 
 onMounted(() => {
+    user.load() // <--- 修正處：在這裡呼叫 load()
+
 
   // 掛載時拉一次購物車數量
   if (user.userId) cart.refresh(user.userId)

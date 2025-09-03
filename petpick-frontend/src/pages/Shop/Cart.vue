@@ -1,97 +1,80 @@
 <template>
-  <div class="container py-4">
-    <h2 class="mb-4">購物車</h2>
-    
-    <!-- 除錯資訊 -->
-    <div class="mb-3 p-3 bg-light rounded">
-      <div class="text-muted mb-2"><strong>除錯資訊：</strong></div>
-      <div class="small">
-        <div>用戶 ID: {{ userId }}</div>
-        <div>購物車商品數: {{ cart.length }}</div>
-        <div>總金額: NT$ {{ totalFormatted }}</div>
-      </div>
-      <details v-if="cart.length > 0" class="mt-2">
-        <summary class="text-muted">查看購物車資料</summary>
-        <pre class="small mt-2 bg-white p-2 border rounded">{{ JSON.stringify(cart, null, 2) }}</pre>
-      </details>
-    </div>
-    
-    <!-- 購物車內容 -->
-    <div v-if="cart.length === 0" class="text-center py-5">
-      <h5>購物車是空的</h5>
-      <RouterLink to="/shop/commodity" class="btn btn-primary">前往購物</RouterLink>
-    </div>
-    
-    <div v-else>
-      <!-- 購物車項目列表 -->
-      <div class="row" v-for="item in cart" :key="item.cartId">
-        <div class="col-12 mb-3">
-          <div class="card">
-            <div class="card-body">
-              <div class="row align-items-center">
-                <div class="col-md-2">
-                  <img :src="item.imageUrl || '/images/no-image.jpg'" 
-                       :alt="item.pname || item.name" 
-                       class="img-fluid rounded">
-                </div>
-                <div class="col-md-4">
-                  <h6>{{ item.pname || item.name || '未知商品' }}</h6>
-                  <p class="text-muted small">{{ item.description || '' }}</p>
-                </div>
-                <div class="col-md-2">
-                  <strong>NT$ {{ Number(item.price || 0) }}</strong>
-                </div>
-                <div class="col-md-2">
-                  <input 
-                    type="number" 
-                    class="form-control" 
-                    :value="item.quantity"
-                    @change="updateQuantity(item, $event.target.value)"
-                    min="1">
-                </div>
-                <div class="col-md-2">
-                  <button 
-                    class="btn btn-outline-danger btn-sm"
-                    @click="askRemove(item)">
-                    移除
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 總計和操作按鈕 -->
-      <div class="row mt-4">
-        <div class="col-md-6">
-          <button class="btn btn-outline-danger" @click="clearCart()">
-            清空購物車
-          </button>
-        </div>
-        <div class="col-md-6 text-end">
-          <h4>總計: NT$ {{ totalFormatted }}</h4>
-          <button class="btn btn-primary btn-lg" @click="goCheckout()">
-            前往結帳
-          </button>
-        </div>
-      </div>
+  <div class="container mt-5 pt-4">
+    <h2 class="text-center mb-4">我的購物車</h2>
+
+    <div class="d-flex justify-content-end mb-2 me-5">
+      <button class="btn bg-danger text-white p-2" @click="clearCart" :disabled="cart.length === 0">
+        移除全部
+      </button>
     </div>
 
-    <!-- 確認刪除 Modal -->
-    <div class="modal fade" ref="confirmModalRef" tabindex="-1">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead class="thead-custom">
+          <tr>
+            <th>商品圖片</th>
+            <th>商品名稱</th>
+            <th>單價</th>
+            <th>數量</th>
+            <th>小計</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="cart.length === 0">
+            <td colspan="6" class="text-center text-muted py-4">購物車是空的</td>
+          </tr>
+
+          <tr v-for="it in cart" :key="it.cartId">
+            <td>
+              <RouterLink :to="{ name: 'productSite', params: { id: String(it.productId) } }"
+                class="text-decoration-none" style="color:black;">
+                <img :src="it.imageUrl || '#'" class="cart-img rounded" alt="商品圖" />
+              </RouterLink>
+            </td>
+            <td>
+              <RouterLink :to="{ name: 'productSite', params: { id: String(it.productId) } }"
+                class="text-decoration-none" style="color:black;">
+                {{ it.pname }}
+              </RouterLink>
+            </td>
+            <td>NT$ {{ (Number(it.price) || 0).toLocaleString('zh-Hant-TW') }}</td>
+            <td style="min-width:120px;">
+              <input type="number" class="form-control form-control-sm w-50" :value="it.quantity" min="1"
+                @change="e => updateQuantity(it, e.target.value)" />
+            </td>
+            <td>NT$ {{ ((Number(it.price) || 0) * (Number(it.quantity) || 0)).toLocaleString('zh-Hant-TW') }}</td>
+            <td>
+              <button class="btn btn-sm p-2" @click="askRemove(it)">
+                <span class="material-icons" style="font-size:20px;">delete</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="text-end">
+      <h4>總金額：<span id="total-price">NT$ {{ totalFormatted }}</span></h4>
+      <button id="checkout-btn" class="btn-custom mt-2" :disabled="cart.length === 0" @click="goCheckout">
+        結帳
+      </button>
+    </div>
+
+    <!-- 刪除確認 Modal -->
+    <div class="modal fade" tabindex="-1" ref="confirmModalRef" aria-labelledby="confirmDeleteLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">確認移除</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <h5 class="modal-title" id="confirmDeleteLabel">確認刪除</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
           </div>
           <div class="modal-body">
-            確定要移除這個商品嗎？
+            確定要移除此項目嗎？
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-danger" @click="confirmRemove()">確認移除</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 10px;" data-bs-dismiss="modal">否</button>
+            <button type="button" class="btn btn-danger btn-sm" style="padding: 2px 10px; border: solid 2px #444;" @click="confirmRemove">是</button>
           </div>
         </div>
       </div>

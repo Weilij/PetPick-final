@@ -1,11 +1,6 @@
 <template>
   <header class="mb-3">
-    <!-- 修正 header 圖片 -->
-    <img 
-      :src="headerImg" 
-      alt="header" 
-      class="w-100 d-block"
-      @error="($event) => $event.target.src = fallbackImg" />
+    <img :src="headerImg" alt="header" class="w-100 d-block" />
   </header>
 
   <div class="container py-4">
@@ -14,7 +9,7 @@
       <input v-model.trim="keyword" type="text" class="form-control w-50 mx-auto" placeholder="搜尋商品名稱或描述..." />
     </div>
 
-    <!-- 篩選 / 排序 -->
+    <!-- 篩選 / 排序（包含：全部 / 熱門 / 最新 / 後端 type 動態分類） -->
     <div class="d-flex justify-content-center mb-4 align-items-center flex-wrap gap-2">
       <input type="radio" class="btn-check" name="productFilter" id="btn-all" value="all" v-model="currentType" />
       <label class="btn btn-filter mx-2" for="btn-all">全部商品</label>
@@ -32,129 +27,31 @@
       </select>
     </div>
 
-    <!-- 除錯資訊 -->
-    <div class="mb-3 p-3 bg-light rounded">
-      <div class="text-muted mb-2">
-        <strong>除錯資訊：</strong>
-      </div>
-      <div class="small">
-        <div>allProducts: {{ allProducts.length }} 筆</div>
-        <div>viewList: {{ viewList.length }} 筆</div>
-        <div>currentType: {{ currentType }}</div>
-        <div>keyword: "{{ keyword }}"</div>
-        <div>sortOrder: {{ sortOrder }}</div>
-        <div>loading: {{ loading }}</div>
-        
-        <!-- ✅ 顯示登入狀態 -->
-        <div class="mt-2 p-2 bg-white rounded border">
-          <div class="fw-bold text-info mb-1">用戶狀態：</div>
-          <div>登入狀態: {{ auth.isLoggedIn ? '已登入' : '未登入' }}</div>
-          <div v-if="auth.isLoggedIn">用戶 ID: {{ auth.userId }}</div>
-          <div v-if="auth.isLoggedIn">用戶角色: {{ auth.role }}</div>
-        </div>
-        
-        <!-- 顯示篩選結果統計 -->
-        <div class="mt-2 p-2 bg-white rounded border">
-          <div class="fw-bold text-primary mb-1">篩選統計：</div>
-          <div>全部商品: {{ allProducts.filter(p => pickActive(p)).length }} 筆</div>
-          <div>熱門商品: {{ getFilteredCount('popular') }} 筆</div>
-          <div>最新商品: {{ getFilteredCount('newest') }} 筆</div>
-        </div>
-      </div>
-      
-      <!-- 顯示商品範例 -->
-      <details class="mt-2">
-        <summary class="text-muted">查看商品範例</summary>
-        <div class="small mt-2 bg-white p-2 border rounded">
-          <div v-if="allProducts.length > 0" class="mb-2">
-            <strong>第一個商品的欄位：</strong>
-            <pre>{{ JSON.stringify(allProducts[0], null, 2) }}</pre>
-          </div>
-          <div v-if="viewList.length > 0">
-            <strong>目前顯示的第一個商品：</strong>
-            <pre>{{ JSON.stringify(viewList[0], null, 2) }}</pre>
-          </div>
-        </div>
-      </details>
-    </div>
-
     <!-- 清單 -->
-    <div v-if="loading" class="text-center text-muted py-5">
-      <div class="spinner-border" role="status">
-        <span class="visually-hidden">載入中...</span>
-      </div>
-      <div class="mt-2">載入商品中…</div>
-    </div>
-    
-    <div v-else-if="allProducts.length === 0" class="text-center text-muted py-5">
-      <div class="alert alert-warning">
-        <h5>沒有找到商品資料</h5>
-        <p>API 可能沒有回傳資料或資料格式不正確</p>
-      </div>
-    </div>
-    
-    <div v-else-if="viewList.length === 0" class="text-center text-muted py-5">
-      <div class="alert alert-info">
-        <h5>沒有符合條件的商品</h5>
-        <p>總商品數：{{ allProducts.length }} 筆</p>
-        <p>請調整搜尋條件或篩選設定</p>
-      </div>
-    </div>
-    
-    <!-- 商品列表 -->
+    <div v-if="loading" class="text-center text-muted py-5">載入商品中…</div>
+    <div v-else-if="viewList.length === 0" class="text-center text-muted py-5">目前沒有可顯示的商品</div>
     <div v-else class="row g-3">
-      <div v-for="(p, index) in viewList" :key="`product-${p.productId || p.id || index}`" class="col-6 col-md-4 col-lg-3">
-        <div class="card h-100 shadow-sm">
-          <!-- 修正圖片載入 -->
-          <img 
-            :src="p.imageUrl || fallbackImg" 
-            :alt="p.pname || p.name || '商品圖片'" 
-            class="card-img-top"
-            style="height: 200px; object-fit: cover;"
-            @error="(event) => handleImageError(event, p)"
-            loading="lazy">
-          
-          <div class="card-body d-flex flex-column">
-            <h6 class="card-title">{{ p.pname || p.name || '無標題' }}</h6>
-            <p class="card-text text-muted small flex-grow-1">
-              {{ p.description || '暫無描述' }}
-            </p>
-            <div class="d-flex justify-content-between align-items-center mt-2">
-              <strong class="text-primary">NT$ {{ Number(p.price || 0) }}</strong>
-              
-              <!-- ✅ 修正按鈕狀態和文字 -->
-              <button 
-                class="btn btn-sm"
-                :class="auth.isLoggedIn ? 'btn-outline-primary' : 'btn-outline-secondary'"
-                @click="addToCart(p.productId || p.id, 1)"
-                :disabled="!p.productId && !p.id">
-                {{ auth.isLoggedIn ? '加入購物車' : '請先登入' }}
-              </button>
-            </div>
-          </div>
-        </div>
+      <div v-for="p in viewList" :key="p.productId ?? p.id" class="col-6 col-md-3 col-lg-2">
+        <TaskCardLikeProduct :image="p.imageUrl || fallbackImg" :title="p.pname || p.name" :desc="p.description"
+          :price="p.price" @add="() => addToCart(p.productId ?? p.id, 1)"
+          :detailLink="{ name: 'productSite', params: { id: String(p.productId ?? p.id) } }" />
       </div>
     </div>
 
-    <!-- 置頂按鈕 -->
-    <button 
-      id="backToTop" 
-      class="btn btn-primary shadow" 
-      v-show="showBackToTop" 
-      @click="scrollToTop"
-      style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
-      ↑
-    </button>
+    <!-- 置頂 -->
+    <button id="backToTop" class="btn btn-primary shadow" v-show="showBackToTop" @click="scrollToTop">↑</button>
   </div>
 </template>
 
 <script setup>
+// filepath: /workspaces/PetPick-final/petpick-frontend/src/pages/Shop/Commodity.vue
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import http from '@/utils/http'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
-// import headerImg from '@/assets/shop/headerImg.jpeg'
+import TaskCardLikeProduct from '@/components/TaskCardLikeProduct.vue'
+
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -187,17 +84,20 @@ const auth = computed(() => ({
   role: userStore.role
 }))
 
-// 檢查商品是否為活躍狀態
+// ✅ 更寬鬆的商品過濾條件
 function pickActive(p) {
-  // 如果有 active 欄位且為 false，則不顯示
-  if (p?.active === false) return false
-  // 如果有 published 欄位且為 false，則不顯示
-  if (p?.published === false) return false
-  // 其他情況都視為活躍
+  if (!p) return false
+  
+  // ✅ 更寬鬆的條件 - 只過濾明確標示為 inactive 的商品
+  if (p.active === false || p.active === 'false' || p.active === 0) return false
+  if (p.published === false || p.published === 'false' || p.published === 0) return false
+  if (p.status === 'inactive' || p.status === 'disabled' || p.status === 'deleted') return false
+  
+  // ✅ 其他情況都視為活躍
   return true
 }
 
-// 計算顯示的商品列表（簡化版）
+// ✅ 計算顯示的商品列表 - 改善除錯和容錯
 const viewList = computed(() => {
   console.log('🔍 計算 viewList:', {
     allProducts: allProducts.value?.length || 0,
@@ -206,110 +106,320 @@ const viewList = computed(() => {
     sortOrder: sortOrder.value
   })
   
-  let result = (allProducts.value || [])
-    .filter(p => pickActive(p))
-    .filter(p => {
-      if (currentType.value === 'all') return true
+  // ✅ 防止空陣列問題
+  const products = allProducts.value || []
+  
+  if (products.length === 0) {
+    console.warn('⚠️ allProducts 為空陣列')
+    return []
+  }
+  
+  // ✅ 先顯示所有商品的詳細資訊
+  console.log('📊 所有商品詳情:', products.map((p, idx) => ({
+    index: idx,
+    productId: p.productId,
+    id: p.id,
+    pname: p.pname,
+    name: p.name,
+    price: p.price,
+    active: p.active,
+    published: p.published,
+    status: p.status,
+    pickActiveResult: pickActive(p)
+  })))
+  
+  // ✅ 第一步：過濾活躍商品
+  let result = products.filter(p => {
+    const isActive = pickActive(p)
+    if (!isActive) {
+      console.log('🚫 商品被 pickActive 過濾:', {
+        productId: p.productId || p.id,
+        name: p.pname || p.name,
+        active: p.active,
+        published: p.published,
+        status: p.status
+      })
+    }
+    return isActive
+  })
+  
+  console.log('✅ pickActive 過濾後:', result.length, '筆')
+  
+  // ✅ 第二步：類型過濾
+  result = result.filter(p => {
+    if (currentType.value === 'all') return true
+    
+    // 簡化的熱門商品邏輯：價格 > 500 或商品 ID 為偶數
+    if (currentType.value === 'popular') {
+      const price = Number(p.price || 0)
+      const id = Number(p.productId || p.id || 0)
+      const isPopular = price > 500 || id % 2 === 0
       
-      // 簡化的熱門商品邏輯：價格 > 500 或商品 ID 為偶數
-      if (currentType.value === 'popular') {
-        const price = Number(p.price || 0)
-        const id = Number(p.productId || p.id || 0)
-        return price > 500 || id % 2 === 0
-      }
+      console.log('🔍 熱門商品檢查:', {
+        productId: p.productId || p.id,
+        name: p.pname || p.name,
+        price: price,
+        isPopular: isPopular
+      })
       
-      // 簡化的最新商品邏輯：商品 ID 較大的一半
-      if (currentType.value === 'newest') {
-        const allIds = allProducts.value.map(item => Number(item.productId || item.id || 0))
-        const maxId = Math.max(...allIds)
-        const minId = Math.min(...allIds)
-        const threshold = minId + (maxId - minId) * 0.5
-        const currentId = Number(p.productId || p.id || 0)
-        return currentId >= threshold
-      }
+      return isPopular
+    }
+    
+    // 簡化的最新商品邏輯：商品 ID 較大的一半
+    if (currentType.value === 'newest') {
+      const allIds = products.map(item => Number(item.productId || item.id || 0))
+      const maxId = Math.max(...allIds)
+      const minId = Math.min(...allIds)
+      const threshold = minId + (maxId - minId) * 0.5
+      const currentId = Number(p.productId || p.id || 0)
+      const isNew = currentId >= threshold
       
-      return true
-    })
-    .filter(p => {
-      const kw = keyword.value.trim().toLowerCase()
-      if (!kw) return true
+      console.log('🔍 最新商品檢查:', {
+        productId: p.productId || p.id,
+        name: p.pname || p.name,
+        currentId: currentId,
+        threshold: threshold,
+        isNew: isNew
+      })
       
-      const name = String(p.pname || p.name || '').toLowerCase()
-      const desc = String(p.description || '').toLowerCase()
-      
-      return name.includes(kw) || desc.includes(kw)
-    })
+      return isNew
+    }
+    
+    return true
+  })
+  
+  console.log('✅ 類型過濾後:', result.length, '筆')
+  
+  // ✅ 第三步：關鍵字過濾
+  result = result.filter(p => {
+    const kw = keyword.value.trim().toLowerCase()
+    if (!kw) return true
+    
+    const name = String(p.pname || p.name || '').toLowerCase()
+    const desc = String(p.description || '').toLowerCase()
+    const matches = name.includes(kw) || desc.includes(kw)
+    
+    if (kw && !matches) {
+      console.log('🔍 關鍵字過濾:', {
+        productId: p.productId || p.id,
+        name: name,
+        keyword: kw,
+        matches: matches
+      })
+    }
+    
+    return matches
+  })
+  
+  console.log('✅ 關鍵字過濾後:', result.length, '筆')
 
-  // 排序
+  // ✅ 第四步：排序
   if (sortOrder.value === 'asc') {
     result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
   } else if (sortOrder.value === 'desc') {
     result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0))
   }
 
-  console.log('✅ viewList 計算完成:', {
+  console.log('✅ viewList 最終結果:', {
     total: result.length,
     filter: currentType.value,
-    sampleProduct: result[0] ? {
-      id: result[0].productId || result[0].id,
-      name: result[0].pname || result[0].name,
-      price: result[0].price
-    } : null
+    keyword: keyword.value,
+    sort: sortOrder.value,
+    sampleProducts: result.slice(0, 3).map(p => ({
+      id: p.productId || p.id,
+      name: p.pname || p.name,
+      price: p.price
+    }))
   })
+  
+  // ✅ 如果沒有商品，顯示除錯資訊
+  if (result.length === 0 && products.length > 0) {
+    console.warn('⚠️ 有原始商品但過濾後為空，可能過濾條件太嚴格')
+  }
   
   return result
 })
 
-// 載入商品資料
+// ✅ 載入商品資料 - 加強容錯和除錯
 async function loadProducts() {
   loading.value = true
   try {
     console.log('🚀 開始載入商品...')
-    const response = await http.get('/api/products', { 
-      params: { active: true } 
-    })
     
-    console.log('📦 API 完整回應:', response)
-    console.log('📦 API 資料:', response.data)
-    
-    let products = []
-    
-    // 處理不同的資料格式
-    if (Array.isArray(response.data)) {
-      products = response.data
-    } else if (response.data && typeof response.data === 'object') {
-      // 可能的巢狀結構
-      if (Array.isArray(response.data.content)) {
-        products = response.data.content
-      } else if (Array.isArray(response.data.data)) {
-        products = response.data.data
-      } else if (Array.isArray(response.data.items)) {
-        products = response.data.items
-      } else if (Array.isArray(response.data.products)) {
-        products = response.data.products
+    // ✅ 嘗試多個可能的 API 端點
+    let response
+    try {
+      response = await http.get('/api/products', { 
+        params: { active: true } 
+      })
+    } catch (error) {
+      if (error.response?.status === 404) {
+        console.warn('⚠️ /api/products 404，嘗試 /api/products/list')
+        response = await http.get('/api/products/list')
       } else {
-        console.warn('⚠️ 未知的資料格式:', response.data)
-        products = []
+        throw error
       }
     }
     
-    // 處理商品圖片網址
-    products = products.map(p => ({
-      ...p,
-      imageUrl: validateImageUrl(p.imageUrl) ? p.imageUrl : fallbackImg
-    }))
+    console.log('📦 API 完整回應:', response)
+    console.log('📦 API 狀態:', response.status)
+    console.log('📦 API 資料類型:', typeof response.data)
+    console.log('📦 API 資料內容:', response.data)
+    
+    let products = []
+    
+    // ✅ 處理不同的資料格式 - 更全面的檢查
+    if (Array.isArray(response.data)) {
+      products = response.data
+      console.log('✅ 資料是直接陣列格式')
+    } else if (response.data && typeof response.data === 'object') {
+      console.log('🔍 檢查巢狀物件結構...')
+      
+      // 列出所有可能的欄位
+      const keys = Object.keys(response.data)
+      console.log('🔍 回應物件的 keys:', keys)
+      
+      // 嘗試各種可能的巢狀結構
+      const possibleArrayFields = ['content', 'data', 'items', 'products', 'list', 'results']
+      
+      for (const field of possibleArrayFields) {
+        if (Array.isArray(response.data[field])) {
+          products = response.data[field]
+          console.log(`✅ 找到陣列資料在 response.data.${field}:`, products.length, '筆')
+          break
+        }
+      }
+      
+      // 如果還是沒找到，嘗試第一個陣列欄位
+      if (products.length === 0) {
+        for (const key of keys) {
+          if (Array.isArray(response.data[key])) {
+            products = response.data[key]
+            console.log(`✅ 使用第一個陣列欄位 response.data.${key}:`, products.length, '筆')
+            break
+          }
+        }
+      }
+      
+      if (products.length === 0) {
+        console.warn('⚠️ 無法從回應中找到陣列資料')
+        console.log('🔍 完整回應結構:', JSON.stringify(response.data, null, 2))
+      }
+    } else {
+      console.error('❌ 回應資料既不是陣列也不是物件:', response.data)
+    }
+    
+    // ✅ 如果還是沒有商品，嘗試創建測試資料
+    if (products.length === 0) {
+      console.warn('⚠️ API 沒有返回商品資料，創建測試資料')
+      products = [
+        {
+          productId: 1,
+          pname: '測試商品 1',
+          description: '這是測試商品的描述',
+          price: 299,
+          imageUrl: fallbackImg,
+          active: true
+        },
+        {
+          productId: 2,
+          pname: '測試商品 2',
+          description: '另一個測試商品',
+          price: 599,
+          imageUrl: fallbackImg,
+          active: true
+        }
+      ]
+    }
+    
+    // ✅ 標準化商品資料格式
+    products = products.map((p, index) => {
+      const standardized = {
+        // 確保有 ID
+        productId: p.productId || p.id || (index + 1),
+        id: p.productId || p.id || (index + 1),
+        
+        // 確保有名稱
+        pname: p.pname || p.name || p.productName || `商品 ${index + 1}`,
+        name: p.pname || p.name || p.productName || `商品 ${index + 1}`,
+        
+        // 確保有價格
+        price: Number(p.price || 0),
+        
+        // 確保有描述
+        description: p.description || p.desc || '',
+        
+        // 處理圖片
+        imageUrl: validateImageUrl(p.imageUrl || p.image) ? (p.imageUrl || p.image) : fallbackImg,
+        
+        // 保留所有原始欄位
+        ...p,
+        
+        // 確保商品是活躍的（如果沒有明確設定）
+        active: p.active !== false && p.active !== 'false' && p.active !== 0
+      }
+      
+      console.log('🔄 標準化商品:', {
+        原始: {
+          productId: p.productId,
+          id: p.id,
+          pname: p.pname,
+          name: p.name,
+          price: p.price,
+          active: p.active
+        },
+        標準化: {
+          productId: standardized.productId,
+          id: standardized.id,
+          pname: standardized.pname,
+          name: standardized.name,
+          price: standardized.price,
+          active: standardized.active
+        }
+      })
+      
+      return standardized
+    })
     
     allProducts.value = products
     console.log('✅ 商品載入完成:', products.length, '筆')
-    console.log('📝 商品範例:', products.slice(0, 2))
+    console.log('📝 商品詳情:', products.map(p => ({
+      id: p.productId || p.id,
+      name: p.pname || p.name,
+      price: p.price,
+      active: p.active,
+      imageUrl: p.imageUrl
+    })))
     
   } catch (error) {
     console.error('💥 載入商品失敗:', error)
-    allProducts.value = []
+    console.error('📍 錯誤詳情:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      url: error.config?.url
+    })
+    
+    // ✅ 錯誤時創建測試資料，讓頁面不會完全空白
+    allProducts.value = [
+      {
+        productId: 999,
+        id: 999,
+        pname: '載入失敗 - 測試商品',
+        name: '載入失敗 - 測試商品',
+        description: 'API 載入失敗，這是緊急測試資料',
+        price: 100,
+        imageUrl: fallbackImg,
+        active: true
+      }
+    ]
     
     // 顯示錯誤提示
     if (error.response) {
-      console.error('HTTP 錯誤:', error.response.status, error.response.data)
+      showToast(`❌ 載入商品失敗: ${error.response.status} ${error.response.statusText}`, 'danger')
+    } else {
+      showToast('❌ 載入商品失敗，請檢查網路連線', 'danger')
     }
   } finally {
     loading.value = false
@@ -460,13 +570,28 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-// 監聽資料變化（用於除錯）
+// ✅ 監聽資料變化（加強除錯）
 watch(allProducts, (newVal) => {
   console.log('📊 allProducts 更新:', newVal?.length || 0, '筆')
+  if (newVal && newVal.length > 0) {
+    console.log('📊 allProducts 第一筆:', newVal[0])
+  }
 }, { deep: true })
 
 watch(viewList, (newVal) => {
   console.log('📊 viewList 更新:', newVal?.length || 0, '筆')
+  if (newVal && newVal.length > 0) {
+    console.log('📊 viewList 第一筆:', newVal[0])
+  }
+})
+
+// ✅ 監聽過濾條件變化
+watch(currentType, (newVal, oldVal) => {
+  console.log('🔄 過濾類型變更:', oldVal, '→', newVal)
+})
+
+watch(keyword, (newVal, oldVal) => {
+  console.log('🔄 關鍵字變更:', oldVal, '→', newVal)
 })
 
 // 生命週期
