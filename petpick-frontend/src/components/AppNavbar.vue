@@ -31,7 +31,9 @@
                 <li>
                   <RouterLink class="dropdown-item" to="/post/adopt">刊登送養</RouterLink>
                 </li>
-                <!-- <li><RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink></li> -->
+                <li>
+                  <RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink>
+                </li>
               </ul>
             </li>
             <li class="nav-item">

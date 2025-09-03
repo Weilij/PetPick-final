@@ -83,14 +83,14 @@
                 <div class="d-flex gap-2">
                   <button
                     v-if="p.status === 'pending'"
-                    class="btn btn-outline-danger btn-sm"
+                    class="btn btn-danger btn-sm"
                     @click="cancelPost(p.id)"
                   >
                     取消刊登
                   </button>
 
                   <template v-if="p.status === 'approved'">
-                    <button class="btn btn-outline-warning btn-sm" @click="holdPost(p.id, true)">
+                    <button class="btn btn-warning btn-sm" @click="holdPost(p.id, true)">
                       暫停
                     </button>
                     <button class="btn btn-outline-secondary btn-sm" @click="closePost(p.id)">
@@ -99,10 +99,10 @@
                   </template>
 
                   <template v-if="p.status === 'on_hold'">
-                    <button class="btn btn-outline-success btn-sm" @click="holdPost(p.id, false)">
+                    <button class="btn btn-success btn-sm" @click="holdPost(p.id, false)">
                       恢復
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm" @click="closePost(p.id)">
+                    <button class="btn btn-secondary btn-sm" @click="closePost(p.id)">
                       關閉
                     </button>
                   </template>

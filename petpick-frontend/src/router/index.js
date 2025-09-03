@@ -91,7 +91,7 @@ const router = createRouter({
     { path: '/my-apply', name: 'MyApply', component: () => import('@/pages/Adopt/MyApply.vue') },
     { path: '/post-review', name: 'PostReview', component: () => import('@/pages/Adopt/PostReview.vue'), meta: { hideNavbar: true, hideFooter: true } },
     { path: '/apply-review', name: 'ApplyReview', component: () => import('@/pages/Adopt/ApplyReview.vue'), meta: { hideNavbar: true, hideFooter: true } },
-    // { path: '/adopt/report', name: 'AdoptReport', component: () => import('@/pages/Adopt/AdoptReport.vue') },
+    { path: '/adopt/report', name: 'AdoptReport', component: () => import('@/pages/Adopt/AdoptReport.vue') },
     { path: '/adopt/view', name: 'AdoptView', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
     { path: '/adopt/:id', name: 'AdoptViewById', component: AdoptView, meta: { title: '領養詳情 - PetPick' } },
 
