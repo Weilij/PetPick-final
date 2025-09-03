@@ -79,10 +79,10 @@
                 <div class="small mb-1">申請者：{{ a.applicantName || a.applicantUserId || '—' }}</div>
                 <div class="small mb-2">留言：{{ a.message || '—' }}</div>
                 <div class="d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-primary btn-sm" @click="openDetail(a.id)">詳情</button>
+                  <button class="btn btn-primary btn-sm btn-compact btn-detail" @click="openDetail(a.id)">詳情</button>
                   <template v-if="a.status === 'pending'">
-                    <button class="btn btn-success btn-sm" @click="approveApp(a.id)">通過</button>
-                    <button class="btn btn-danger btn-sm" @click="rejectApp(a.id)">退回</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="approveApp(a.id)">通過</button>
+                    <button class="btn btn-danger btn-sm btn-compact" @click="rejectApp(a.id)">退回</button>
                   </template>
                 </div>
               </div>
@@ -137,8 +137,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-danger" :disabled="modalData?.status !== 'pending'" @click="rejectApp(modalData?.id, true)">退回</button>
-          <button class="btn btn-success" :disabled="modalData?.status !== 'pending'" @click="approveApp(modalData?.id, true)">通過</button>
+          <button class="btn btn-danger btn-sm btn-compact" :disabled="modalData?.status !== 'pending'" @click="rejectApp(modalData?.id, true)">退回</button>
+          <button class="btn btn-success btn-sm btn-compact" :disabled="modalData?.status !== 'pending'" @click="approveApp(modalData?.id, true)">通過</button>
         </div>
       </div>
     </div>
@@ -530,4 +530,23 @@ onMounted(async () => {
 @media (max-width: 576px) {
   .carousel-img { height: 300px; }
 }
+
+/* 小按鈕統一尺寸：給詳情 / 通過 / 退回 / （以及 Modal 內） */
+.btn-compact{
+  padding: .35rem .7rem;
+  font-size: .875rem;       /* 約 14px */
+  border-radius: .5rem;
+}
+
+/* 只把「詳情」做成藍色（不影響搜尋按鈕） */
+.btn-detail{
+  background-color:#0d6efd !important;
+  border-color:#0d6efd !important;
+  color:#fff !important;
+}
+.btn-detail:hover{
+  background-color:#0b5ed7 !important;
+  border-color:#0a58ca !important;
+}
+
 </style>

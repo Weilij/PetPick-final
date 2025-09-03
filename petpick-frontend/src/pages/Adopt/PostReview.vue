@@ -75,21 +75,21 @@
                 <div class="small mb-1">動物：{{ animalLine(p) }}</div>
                 <div class="small mb-2">聯絡：{{ contactLine(p) }}</div>
                 <div class="d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-primary btn-sm" @click="openDetail(p.id)">詳情</button>
+                  <button class="btn btn-primary btn-sm btn-compact btn-detail" @click="openDetail(p.id)">詳情</button>
 
                   <template v-if="p.status==='pending'">
-                    <button class="btn btn-success btn-sm" @click="updateStatus(p.id,'approved')">通過</button>
-                    <button class="btn btn-danger btn-sm"  @click="updateStatus(p.id,'rejected')">退回</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="updateStatus(p.id,'approved')">通過</button>
+                    <button class="btn btn-danger btn-sm btn-compact"  @click="updateStatus(p.id,'rejected')">退回</button>
                   </template>
 
                   <template v-else-if="p.status==='approved'">
-                    <button class="btn btn-outline-warning btn-sm" @click="adminHold(p.id,true)">暫停</button>
-                    <button class="btn btn-outline-secondary btn-sm" @click="adminClose(p.id)">關閉</button>
+                    <button class="btn btn-warning btn-sm btn-compact" @click="adminHold(p.id,true)">暫停</button>
+                    <button class="btn btn-secondary btn-sm btn-compact" @click="adminClose(p.id)">關閉</button>
                   </template>
 
                   <template v-else-if="p.status==='on_hold'">
-                    <button class="btn btn-outline-success btn-sm" @click="adminHold(p.id,false)">恢復</button>
-                    <button class="btn btn-outline-secondary btn-sm" @click="adminClose(p.id)">關閉</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="adminHold(p.id,false)">恢復</button>
+                    <button class="btn btn-secondary btn-sm btn-compact" @click="adminClose(p.id)">關閉</button>
                   </template>
                 </div>
               </div>
@@ -156,8 +156,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-danger"  :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'rejected',true)">退回</button>
-          <button class="btn btn-success" :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'approved',true)">通過</button>
+          <button class="btn btn-danger btn-sm btn-compact"  :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'rejected',true)">退回</button>
+          <button class="btn btn-success btn-sm btn-compact" :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'approved',true)">通過</button>
         </div>
       </div>
     </div>
@@ -424,4 +424,23 @@ onMounted(async () => {
 /* Modal 內的輪播圖尺寸 */
 .carousel-img { width:100%; height:420px; object-fit:contain; background:#f8f9fa; border-radius:.5rem; }
 @media (max-width:576px){ .carousel-img{ height:300px; } }
+
+/* 按鈕縮小一點（所有需要的小按鈕都加 btn-compact） */
+.post-review-page .btn-compact{
+  padding: .35rem .7rem;
+  font-size: .875rem;        /* ≈14px */
+  border-radius: .5rem;
+}
+
+/* 只把「詳情」做成藍色，不影響搜尋 */
+.post-review-page .btn-detail{
+  background-color:#0d6efd !important;
+  border-color:#0d6efd !important;
+  color:#fff !important;
+}
+.post-review-page .btn-detail:hover{
+  background-color:#0b5ed7 !important;
+  border-color:#0a58ca !important;
+}
+
 </style>
