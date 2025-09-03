@@ -89,10 +89,24 @@
 
                 <div class="small text-muted">{{ p.city || '' }} {{ p.district || '' }}</div>
 
-                <div class="mt-1 small">
-                  種類：{{ p.species || '' }}　品種：{{ p.breed || '' }}
-                  <img v-if="sexUrl(p.sex)" :src="sexUrl(p.sex)" class="sex-icon" alt="" />
-                  {{ sexTextForCard(p.sex) }}　年齡：{{ p.age || '' }}
+                <div class="meta mt-1">
+                  <div class="meta-row">
+                    <span class="meta-label">種類：</span>
+                    <span class="meta-value">{{ p.species || '—' }}</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">品種：</span>
+                    <span class="meta-value">{{ p.breed || '—' }}</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">性別：</span>
+                    <img v-if="sexUrl(p.sex)" :src="sexUrl(p.sex)" class="sex-icon" alt="" />
+                    <span class="meta-value">{{ sexTextForCard(p.sex) || '—' }}</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">年齡：</span>
+                    <span class="meta-value">{{ p.age || '—' }}</span>
+                  </div>
                 </div>
 
                 <p class="mt-2 small text-truncate-2" :title="p.description || ''">
@@ -128,7 +142,7 @@
             :class="{ 'is-invalid': gotoInvalid }"
             placeholder="頁碼"
           />
-          <button class="btn btn-outline-secondary ms-2" @click="jumpTo">前往</button>
+          <button class="btn btn-outline-secondary" @click="jumpTo">前往</button>
         </div>
       </div>
 
@@ -418,17 +432,15 @@ onMounted(async () => {
 .filter-bar .keyword .btn { white-space: nowrap; }
 h2.page-title { margin-bottom: .75rem; }
 
-/* 美化搜尋欄：膠囊圓角 + 陰影（確保覆蓋） */
-.adopt-page select.form-select,
-.adopt-page input.form-control {
-  border-radius: 20px !important;
+/* 只套在篩選列，不要影響頁碼輸入框 */
+.filter-bar :is(select.form-select, input.form-control) {
+  border-radius: 20px;
   padding: 10px 16px;
   box-shadow: 0 2px 6px rgba(0,0,0,.08);
   border: 1px solid #ccc;
   transition: border-color .3s ease, box-shadow .3s ease;
 }
-.adopt-page select.form-select:focus,
-.adopt-page input.form-control:focus {
+.filter-bar :is(select.form-select, input.form-control):focus {
   border-color: #d19f72;
   box-shadow: 0 0 0 .2rem rgba(209,159,114,.3);
 }
@@ -444,17 +456,21 @@ h2.page-title { margin-bottom: .75rem; }
 .sex-icon { height: 18px; width: 18px; object-fit: contain; vertical-align: middle; margin: 0 4px;
   background-color: #fff; border-radius: 50%; padding: 1px; border: 1px solid #ccc; }
 
-/* 分頁與輸入（還原你的樣式） */
-.is-invalid { border-color: red; box-shadow: 0 0 0 .1rem rgba(255,0,0,.25) !important; }
-
+/* 頁碼外觀 */
 #page-info { font-weight: bold; color: #666; }
-
-.goto-group .input-group-text {
+.input-group .form-control {   
+  border-left: none;
+  border-radius: 0;
+  border: 1px solid #d2b48c;         /* 與 govlist 一樣的邊框 */
+  border-left: 0;                     /* 與左邊文字塊銜接 */
+  box-shadow: none;
+  outline: none; }
+.input-group .btn { border-radius: 0 30px 30px 0; background-color: #d19f72; border: none; font-weight: 500; }
+.input-group .btn:hover { background-color: #b9845e; }
+.input-group .input-group-text {
   background-color: #fff; color: #5a3f29; border: 1px solid #d2b48c;
-  padding: .5rem .75rem; font-weight: 500; border-radius: 30px 0 0 30px;
+  padding: 0.5rem 0.75rem; font-weight: 500; border-radius: 30px 0 0 30px;
 }
-.goto-group .form-control { border-left: none; border-radius: 0; }
-.goto-group .btn { border-radius: 0 30px 30px 0; }
 
 .pagination .page-link {
   color: #8d6748; border: 1px solid #d2b48c; background-color: #fff; border-radius: 8px; transition: .2s;
@@ -486,5 +502,15 @@ h2.page-title { margin-bottom: .75rem; }
   width: 48px; height: 48px; border: 5px solid #eee; border-top: 5px solid #d19f72;
   border-radius: 50%; animation: spin .8s linear infinite;
 }
+
+.meta { font-size: .95rem; }
+.meta-row { display:flex; align-items:center; gap:.4rem; line-height:1.2; margin-top:.15rem; }
+.meta-label { font-weight:700; color:#555; min-width:3.5rem; }
+.meta-value { color:#333; word-break:break-word; }
+
+/* 可選：在中大螢幕排兩欄（想要就把外層 div class 改為 "meta meta-2col"） */
+.meta-2col { display:grid; grid-template-columns: 1fr 1fr; column-gap:12px; }
+.meta-2col .meta-row { margin-top:.25rem; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
