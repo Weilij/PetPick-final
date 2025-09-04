@@ -73,7 +73,7 @@
 
               <ul v-show="user.isLogin" class="dropdown-menu dropdown-menu-end shadow">
                 <li>
-                  <RouterLink class="dropdown-item" to="/adminOrders">後臺管理</RouterLink>
+                  <RouterLink class="dropdown-item" to="/adminOrders" target="_blank" rel="noopener noreferrer">後臺管理</RouterLink>
                 </li>
                 <li>
                   <RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink>
