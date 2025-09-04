@@ -121,7 +121,7 @@
                                 </th>
                                 <th>訂單編號</th>
                                 <th>會員</th>
-                                <th>金額</th>
+                                <th>金額（含運）</th>
                                 <th>狀態</th>
                                 <th>配送</th>
                                 <th>下單時間</th>
@@ -143,7 +143,7 @@
                                     <div class="text-muted">{{ (o.merchantTradeNo || '').trim() }}</div>
                                 </td>
                                 <td>{{ o.receiverName || o.userName || (o.userId != null ? '#' + o.userId : '—') }}</td>
-                                <td>NT${{ (Number(o.totalPrice || o.total || 0)).toLocaleString('zh-Hant-TW') }}</td>
+                                <td>NT${{ fmtMoney(moneyTotalOf(o)) }}</td>
                                 <td class="td-status">
                                     <span class="badge me-1" :class="badgeCls(payStatusOf(o))">付款：{{ payStatusOf(o)
                                         }}</span><br />
@@ -158,8 +158,8 @@
                                     <button class="btn btn-sm btn-outline-secondary btn-compact"
                                         @click="onOpenStatus(o.orderId, o.status)">變更物流狀態</button>
                                     <button class="btn btn-sm btn-success btn-compact"
-                                        @click="onOpenMarkPaid(o.orderId, Number(o.totalPrice || o.total || 0))">付款</button>
-                                    <button class="btn btn-sm btn-info btn-compact"
+                                        @click="onOpenMarkPaid(o.orderId, moneyTotalOf(o))">付款</button> <button
+                                        class="btn btn-sm btn-info btn-compact"
                                         @click="onOpenLogistics(o.orderId)">物流</button>
                                     <button class="btn btn-sm btn-outline-danger btn-compact"
                                         @click="onOpenCancel(o.orderId)">取消</button>
@@ -494,7 +494,7 @@ async function onMarkPaid() {
                 orderIds: markPaidForm.ids,
                 gateway: markPaidForm.gateway || 'Manual',
                 tradeNo: markPaidForm.tradeNo || '',
-                paidAmount: Number(markPaidForm.paidAmount || 0)
+                paidAmount: num(amount)
             })
         } else if (markPaidForm.orderId) {
             await http.post(`${API_BASE}/${markPaidForm.orderId}/mark-paid`, { gateway: markPaidForm.gateway || 'Manual', tradeNo: markPaidForm.tradeNo || '', paidAmount: Number(markPaidForm.paidAmount || 0) })
@@ -737,7 +737,7 @@ function collectRows() {
     return ordersSorted.value.map(o => {
         const id = `#${o.orderId}`, mtn = (o.merchantTradeNo || '').trim()
         const member = (o.receiverName || o.userName || (o.userId != null ? `#${o.userId}` : '—')).toString()
-        const amount = `NT$${Number(o.totalPrice || o.total || 0).toLocaleString('zh-Hant-TW')}`
+        const amount = `NT$${fmtMoney(moneyTotalOf(o))}`        
         const status = `付款：${payStatusOf(o)} 配送：${deliveryStatusOf(o)}`, delivery = displayDelivery(o), time = fmtDateTime(o.createdAt || o.date)
         return [id.replace(/^#/, ''), mtn, member, amount.replace(/^NT\$/, ''), status, delivery, time]
     })
@@ -822,6 +822,28 @@ function csvCell(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s
 function escapeHtml(s) { return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;') }
 async function safeText(r) { try { return await r.text() } catch { return `HTTP ${r.status}` } }
 function wait(ms) { return new Promise(res => setTimeout(res, ms)) }
+function num(x) {
+    const n = Number(x)
+    return Number.isFinite(n) ? n : 0
+}
+
+function moneyTotalOf(o) {
+    // 1) 先用後端可能已含運的欄位
+    const direct = [o.grandTotal, o.payable, o.amount, o.total, o.totalPrice]
+        .map(num).find(n => n > 0)
+    if (direct) return direct
+
+    // 2) 沒有就自己算：小計 + 運費 − 折扣（相容多種命名）
+    const items = num(o.itemsTotal ?? o.subtotal ?? o.itemsSubtotal ?? o.totalWithoutShipping)
+    const ship = num(o.shippingFee ?? o.shipping_fee ?? o.freight ?? o.shipping)
+    const disc = num(o.discount ?? o.discountAmount ?? o.couponDiscount)
+    return items + ship - disc
+}
+
+function fmtMoney(n) {
+    return num(n).toLocaleString('zh-Hant-TW')
+}
+
 </script>
 
 <style scoped>
