@@ -2,7 +2,7 @@
   <div class="container-fluid post-review-page">
     <div class="row">
     <!-- 側邊選單 -->
-    <AdminSidebar active="Admin" />
+    <AdminSidebar active="posts" />
 
       <!-- 主內容 -->
       <main class="col-md-10 ms-sm-auto px-md-4 py-4">
@@ -75,21 +75,21 @@
                 <div class="small mb-1">動物：{{ animalLine(p) }}</div>
                 <div class="small mb-2">聯絡：{{ contactLine(p) }}</div>
                 <div class="d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-primary btn-sm" @click="openDetail(p.id)">詳情</button>
+                  <button class="btn btn-primary btn-sm btn-compact btn-detail" @click="openDetail(p.id)">詳情</button>
 
                   <template v-if="p.status==='pending'">
-                    <button class="btn btn-success btn-sm" @click="updateStatus(p.id,'approved')">通過</button>
-                    <button class="btn btn-danger btn-sm"  @click="updateStatus(p.id,'rejected')">退回</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="updateStatus(p.id,'approved')">通過</button>
+                    <button class="btn btn-danger btn-sm btn-compact"  @click="updateStatus(p.id,'rejected')">退回</button>
                   </template>
 
                   <template v-else-if="p.status==='approved'">
-                    <button class="btn btn-outline-warning btn-sm" @click="adminHold(p.id,true)">暫停</button>
-                    <button class="btn btn-outline-secondary btn-sm" @click="adminClose(p.id)">關閉</button>
+                    <button class="btn btn-warning btn-sm btn-compact" @click="adminHold(p.id,true)">暫停</button>
+                    <button class="btn btn-secondary btn-sm btn-compact" @click="adminClose(p.id)">關閉</button>
                   </template>
 
                   <template v-else-if="p.status==='on_hold'">
-                    <button class="btn btn-outline-success btn-sm" @click="adminHold(p.id,false)">恢復</button>
-                    <button class="btn btn-outline-secondary btn-sm" @click="adminClose(p.id)">關閉</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="adminHold(p.id,false)">恢復</button>
+                    <button class="btn btn-secondary btn-sm btn-compact" @click="adminClose(p.id)">關閉</button>
                   </template>
                 </div>
               </div>
@@ -156,8 +156,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-danger"  :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'rejected',true)">退回</button>
-          <button class="btn btn-success" :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'approved',true)">通過</button>
+          <button class="btn btn-danger btn-sm btn-compact"  :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'rejected',true)">退回</button>
+          <button class="btn btn-success btn-sm btn-compact" :disabled="detail.status!=='pending'" @click="updateStatus(detail.id,'approved',true)">通過</button>
         </div>
       </div>
     </div>
@@ -165,15 +165,56 @@
 </template>
 
 <script setup>
+/* ===========================================
+ * Imports
+ * =========================================== */
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import AdminSidebar from '@/components/AppSideBar.vue'
-import http from '@/utils/http'   // ✅ 改成使用 http
+import AdminSidebar from '@/components/AppSideBar.vue'  // 元件在 <template> 有用到
+import http from '@/utils/http'
 
+/* ===========================================
+ * 圖片相關（只宣告一次）
+ * - 統一把相對路徑補成後端完整 URL
+ * - 兼容 image1/2/3、images 陣列、images JSON 字串
+ * =========================================== */
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const fallback = '/images/no-image.jpg'
+
+function imgUrl (path) {
+  if (!path) return fallback
+  if (/^https?:\/\//i.test(path)) return path
+  const p = path.startsWith('/') ? path : '/' + path
+  return API_BASE + p
+}
+function safeParseArray (v) {
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+function onImgError (e) {
+  // 避免循環觸發
+  e.target.onerror = null
+  e.target.src = fallback
+}
+function firstImg (p = {}) {
+  const candidates = [
+    p.image1, p.image2, p.image3,
+    ...(Array.isArray(p.images) ? p.images : []),
+    ...(typeof p.images === 'string' ? safeParseArray(p.images) : [])
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  const first = candidates[0]
+  return first ? imgUrl(first) : fallback
+}
+
+/* ===========================================
+ * Router
+ * =========================================== */
 const route = useRoute()
 const router = useRouter()
 
-// ====== auth ======
+/* ===========================================
+ * Auth（可切 ENFORCE_ADMIN 嚴格限制）
+ * =========================================== */
 const ENFORCE_ADMIN = false
 async function checkAdmin () {
   try {
@@ -186,7 +227,9 @@ async function checkAdmin () {
   }
 }
 
-// ====== state & url ======
+/* ===========================================
+ * URL 參數狀態（篩選 + 分頁）
+ * =========================================== */
 const state = reactive({
   page: +(route.query.page ?? 0),
   size: +(route.query.size ?? 24),
@@ -195,7 +238,7 @@ const state = reactive({
   q: route.query.q ?? ''
 })
 
-function syncUrl(push = false){
+function syncUrl (push = false) {
   const q = {}
   if (state.status && state.status !== 'all') q.status = state.status
   if (state.species) q.species = state.species
@@ -206,7 +249,9 @@ function syncUrl(push = false){
   push ? router.push(loc) : router.replace(loc)
 }
 
-// ====== list & pager ======
+/* ===========================================
+ * 清單/分頁資料
+ * =========================================== */
 const loading = ref(false)
 const items   = ref([])
 const page    = reactive({ number: 0, totalPages: 0, totalElements: 0 })
@@ -217,7 +262,7 @@ const resultText = computed(() => {
   return `共 ${page.totalElements} 筆，第 ${page.number + 1}/${page.totalPages} 頁`
 })
 
-function buildParams(){
+function buildParams () {
   const p = new URLSearchParams()
   if (state.status && state.status !== 'all') p.set('status', state.status)
   if (state.species) p.set('species', state.species)
@@ -226,46 +271,48 @@ function buildParams(){
   return p.toString()
 }
 
-async function load(){
+async function load () {
   loading.value = true
-  try{
+  try {
     const { data } = await http.get(`/api/adopts?${buildParams()}`)
     items.value = Array.isArray(data) ? data : (data.content || [])
     page.number = data.number ?? 0
     page.totalPages = data.totalPages ?? 0
     page.totalElements = data.totalElements ?? items.value.length
-  }catch(e){
+  } catch (e) {
     console.error(e)
-    items.value = []; page.number = 0; page.totalPages = 0; page.totalElements = 0
-  }finally{
+    items.value = []
+    page.number = 0
+    page.totalPages = 0
+    page.totalElements = 0
+  } finally {
     loading.value = false
   }
 }
 
-function onSearch(){
+function onSearch () {
   state.page = 0
   syncUrl(true)
   load()
 }
-function go(n){
+function go (n) {
   if (n < 0 || (page.totalPages && n >= page.totalPages)) return
   state.page = n
   syncUrl(true)
   load()
 }
 
-// ====== helpers (render) ======
-const fallback = '/images/no-image.jpg'
-function onImgError(e){ e.target.onerror = null; e.target.src = fallback }
-function firstImg(p){ return p?.image1 || p?.image2 || p?.image3 || fallback }
-const place = (p={}) => [p.city, p.district].filter(Boolean).join(' ')
-const sexText = (s) => s==='male' ? '公' : s==='female' ? '母' : '—'
-const neuterText = (n) => n==='yes' ? '是' : n==='no' ? '否' : '不確定'
-const ageLimitText = (a) => a==='age20plus' ? '20歲以上' : a==='age25plus' ? '25歲以上' : '不限'
-const contactMethodText = (m) => m==='line_only' ? '僅 LINE' : '電話＋簡訊'
+/* ===========================================
+ * 顯示輔助（純字串處理）
+ * =========================================== */
+const place = (p = {}) => [p.city, p.district].filter(Boolean).join(' ')
+const sexText = (s) => s === 'male' ? '公' : s === 'female' ? '母' : '—'
+const neuterText = (n) => n === 'yes' ? '是' : n === 'no' ? '否' : '不確定'
+const ageLimitText = (a) => a === 'age20plus' ? '20歲以上' : a === 'age25plus' ? '25歲以上' : '不限'
+const contactMethodText = (m) => m === 'line_only' ? '僅 LINE' : '電話＋簡訊'
 const boolText = (b) => b ? '需要' : '不需要'
-const animalLine = (p={}) => [p.species, p.breed, sexText(p.sex), p.age, p.bodyType].filter(Boolean).join('｜')
-const contactLine = (p={}) => {
+const animalLine = (p = {}) => [p.species, p.breed, sexText(p.sex), p.age, p.bodyType].filter(Boolean).join('｜')
+const contactLine = (p = {}) => {
   const a = [`聯絡人：${p.contactName || '—'}`, `電話：${p.contactPhone || '—'}`]
   if (p.contactLine) a.push(`LINE：${p.contactLine}`)
   return a.join('　')
@@ -279,34 +326,44 @@ const badge = (s) => ({
   pending:   '<span class="badge bg-warning text-dark badge-status">審核中</span>'
 }[s] || `<span class="badge bg-dark">${s}</span>`)
 
-// ====== 詳情 Modal ======
+/* ===========================================
+ * 詳情 Modal（只宣告一次）
+ * =========================================== */
 const modalRef = ref(null)
 let bsModal = null
 const detail = ref(null)
+
 const detailImages = computed(() => {
   if (!detail.value) return [fallback]
-  const arr = [detail.value.image1, detail.value.image2, detail.value.image3].filter(u => !!u && String(u).trim())
-  return arr.length ? arr : [fallback]
+  const list = [
+    detail.value.image1, detail.value.image2, detail.value.image3,
+    ...(Array.isArray(detail.value.images) ? detail.value.images : []),
+    ...(typeof detail.value.images === 'string' ? safeParseArray(detail.value.images) : [])
+  ].filter(u => typeof u === 'string' && u.trim())
+  return list.length ? list.map(imgUrl) : [fallback]
 })
+
 const carouselId = computed(() => `mCarousel-${detail.value?.id || 'x'}`)
 
-async function openDetail(id){
+async function openDetail (id) {
   detail.value = null
   await nextTick()
   if (!bsModal && window.bootstrap) bsModal = new window.bootstrap.Modal(modalRef.value)
   if (bsModal) bsModal.show()
 
-  try{
+  try {
     const { data } = await http.get(`/api/adopts/${id}`)
     detail.value = data
-  }catch(e){
+  } catch (e) {
     console.error(e)
-    detail.value = { title:'讀取失敗' }
+    detail.value = { title: '讀取失敗' }
   }
 }
 
-// ====== Admin actions ======
-async function updateStatus(id, act, closeModal=false){
+/* ===========================================
+ * Admin actions
+ * =========================================== */
+async function updateStatus (id, act, closeModal = false) {
   let reason = ''
   if (act === 'rejected') reason = prompt('退件原因（可留空）') || ''
   try {
@@ -314,7 +371,7 @@ async function updateStatus(id, act, closeModal=false){
       params: { status: act, reason }
     })
     alert(status === 200 ? '已更新' : '更新失敗')
-    if (status === 200){
+    if (status === 200) {
       if (closeModal && bsModal) bsModal.hide()
       load()
     }
@@ -322,18 +379,16 @@ async function updateStatus(id, act, closeModal=false){
     alert('更新失敗')
   }
 }
-async function adminHold(id, hold){
+async function adminHold (id, hold) {
   try {
-    const { status } = await http.patch(`/api/posts/${id}/hold`, null, {
-      params: { hold }
-    })
+    const { status } = await http.patch(`/api/posts/${id}/hold`, null, { params: { hold } })
     alert(status === 200 ? '已更新' : '更新失敗')
     if (status === 200) load()
   } catch {
     alert('更新失敗')
   }
 }
-async function adminClose(id){
+async function adminClose (id) {
   try {
     const { status } = await http.patch(`/api/posts/${id}/close`)
     alert(status === 200 ? '已關閉' : '關閉失敗')
@@ -343,13 +398,16 @@ async function adminClose(id){
   }
 }
 
-// ====== boot ======
+/* ===========================================
+ * Boot
+ * =========================================== */
 onMounted(async () => {
   await checkAdmin()
   syncUrl(false)
   load()
 })
 </script>
+
 
 
 <style scoped>
@@ -366,4 +424,23 @@ onMounted(async () => {
 /* Modal 內的輪播圖尺寸 */
 .carousel-img { width:100%; height:420px; object-fit:contain; background:#f8f9fa; border-radius:.5rem; }
 @media (max-width:576px){ .carousel-img{ height:300px; } }
+
+/* 按鈕縮小一點（所有需要的小按鈕都加 btn-compact） */
+.post-review-page .btn-compact{
+  padding: .35rem .7rem;
+  font-size: .875rem;        /* ≈14px */
+  border-radius: .5rem;
+}
+
+/* 只把「詳情」做成藍色，不影響搜尋 */
+.post-review-page .btn-detail{
+  background-color:#0d6efd !important;
+  border-color:#0d6efd !important;
+  color:#fff !important;
+}
+.post-review-page .btn-detail:hover{
+  background-color:#0b5ed7 !important;
+  border-color:#0a58ca !important;
+}
+
 </style>

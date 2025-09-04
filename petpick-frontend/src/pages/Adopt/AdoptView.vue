@@ -90,8 +90,16 @@
         <div class="mb-2"><strong>是否結紮：</strong>{{ neuterText(post.neutered) }}</div>
 
         <div class="mb-2"><strong>聯絡方式：</strong>{{ contactMethodText(post.contactMethod) }}</div>
+        
+        <!-- 民眾送養：登入才顯示個資 -->
         <div class="mb-2" v-if="auth.loggedIn && post.sourceType === 'user'">
           <strong>聯絡資訊：</strong>{{ contactLine(post) }}
+        </div>
+
+        <!-- 平台刊登：一律顯示固定客服資訊（不受登入影響） -->
+        <div class="mb-2" v-else-if="post.sourceType === 'platform'">
+          <strong>聯絡資訊：</strong>
+          <span class="contact-text">{{ platformContactText }}</span>
         </div>
 
         <hr class="my-2" />
@@ -109,7 +117,7 @@
           <div v-if="!auth.loggedIn">
             <div v-if="post.sourceType === 'user'" class="alert alert-warning">聯絡資訊僅登入會員可見</div>
             <div v-else class="alert alert-info">
-              官方刊登，<RouterLink to="/login">請登入</RouterLink> 以進一步申請
+              官方刊登，<RouterLink to="/login">請登入</RouterLink> 以進一步申請;也可直接聯絡 {{ platformContactText }}
             </div>
           </div>
 
@@ -133,11 +141,20 @@
               <div v-else class="alert alert-secondary">你已送出申請，請等待審核。</div>
             </div>
             <div v-else class="d-flex align-items-start gap-2 flex-md-nowrap">
-              <textarea v-model.trim="applyMsg" class="form-control flex-grow-1" rows="2"
-                        placeholder="想說的話（選填）" style="min-width:0"></textarea>
-              <button class="btn btn-outline-secondary flex-shrink-0" style="white-space:nowrap"
-                      @click="apply">
-                我要領養
+              <textarea
+                v-model.trim="applyMsg"
+                class="form-control flex-grow-1"
+                rows="2"
+                placeholder="想說的話（選填）"
+                :disabled="isApplyDisabled"
+                style="min-width:0"></textarea>
+
+              <button
+                class="btn btn-outline-secondary flex-shrink-0"
+                style="white-space:nowrap"
+                :disabled="isApplyDisabled"
+                @click="apply">
+                {{ submitting ? '送出中…' : '我要領養' }}
               </button>
             </div>
           </div>
@@ -174,6 +191,20 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import http from '@/utils/http'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const imgUrl = (path) => {
+  if (!path) return '/images/no-image.jpg'
+  if (/^https?:\/\//i.test(path)) return path
+  const p = path.startsWith('/') ? path : '/' + path
+  return API_BASE + p
+}
+
+const isApplyDisabled = computed(() =>
+  submitting.value ||
+  post.value.appliedByMe ||
+  post.value.status !== 'approved'
+)
+
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -183,6 +214,7 @@ const loading = ref(true)
 const error = ref(false)
 const post = ref({})
 const applyMsg = ref('')
+const submitting = ref(false)
 
 // ✅ 使用 store 的認證狀態
 const auth = computed(() => ({
@@ -190,6 +222,27 @@ const auth = computed(() => ({
   role: userStore.role,
   uid: userStore.userId
 }))
+
+// 固定的「平台客服」資訊（可被 .env 覆蓋）
+const PLATFORM_CONTACT = Object.freeze({
+  name: import.meta.env.VITE_PLATFORM_CONTACT_NAME ?? 'PetPick 客服',
+  phone: import.meta.env.VITE_PLATFORM_CONTACT_PHONE ?? '02-1234-5678',
+  line: import.meta.env.VITE_PLATFORM_CONTACT_LINE ?? 'petpick123',
+  email: import.meta.env.VITE_PLATFORM_CONTACT_EMAIL ?? 'petpick123@gmail.com',
+  hours: import.meta.env.VITE_PLATFORM_CONTACT_HOURS ?? '週一至週五 09:00–18:00'
+})
+
+const platformContactText = computed(() => {
+  const parts = [
+    PLATFORM_CONTACT.name ? `${PLATFORM_CONTACT.name}` : null,
+    PLATFORM_CONTACT.phone ? `電話：${PLATFORM_CONTACT.phone}` : null,
+    PLATFORM_CONTACT.line ? `LINE：${PLATFORM_CONTACT.line}` : null,
+    PLATFORM_CONTACT.email ? `\nEmail：${PLATFORM_CONTACT.email}` : null,
+    PLATFORM_CONTACT.hours ? `（服務時間：${PLATFORM_CONTACT.hours}）` : null
+  ].filter(Boolean)
+  return parts.join('　')
+})
+
 
 // ------------ helpers ------------
 const normalizeSex = (s) => {
@@ -221,9 +274,10 @@ const sexUrl = (s) => {
 }
 
 const images = computed(() => {
-  const arr = [post.value.image1, post.value.image2, post.value.image3].filter((u) => !!u && String(u).trim())
-  if (!arr.length) arr.push('/images/no-image.jpg')
-  return arr
+  const arr = [post.value.image1, post.value.image2, post.value.image3]
+    .filter(u => !!u && String(u).trim())
+    .map(imgUrl)
+  return arr.length ? arr : ['/images/no-image.jpg']
 })
 
 const sourceBadge = computed(() =>
@@ -281,53 +335,93 @@ async function load() {
   }
 }
 
-async function apply() {
-  const id = route.params.id || route.query.id
+  async function apply() {
+  // 1) 未登入就導去登入
+  if (!auth.value.loggedIn) {
+    alert('❌ 請先登入才能申請領養')
+    router.push('/login')
+    return
+  }
+
+  // 2) 防連點 & 已申請就不要再送
+  if (submitting.value || post.value.appliedByMe) return
+  submitting.value = true
+
+  // 3) 這裡固定先把貼文 id 取出來（不要在 try 裡宣告，避免 scope 問題）
+  const pid = route.params.id || route.query.id
+  if (!pid) {
+    alert('❌ 找不到貼文 ID')
+    submitting.value = false
+    return
+  }
+
   try {
-    if (!auth.value.loggedIn) {
-      alert('❌ 請先登入才能申請領養')
-      router.push('/login')
-      return
+    // 4) 送出申請
+    const resp = await http.post(`/api/adopts/${pid}/apply`, { message: applyMsg.value || null })
+
+    // 樂觀更新(可留可不留)，至少要拿到申請 id 供取消用
+    post.value.appliedByMe = true
+    post.value.myPendingApplicationId = resp?.data?.id ?? null
+
+    // 5) 成功後直接把畫面鎖住（不等重新載入）
+    post.value.appliedByMe = true
+    post.value.myPendingApplicationId = resp?.data?.id ?? post.value.myPendingApplicationId ?? null
+    if (typeof post.value.pendingApplications === 'number') {
+      post.value.pendingApplications += 1
     }
 
-    // ✅ 使用 http axios 實例，會自動帶 JWT token
-    const response = await http.post(`/api/adopts/${id}/apply`, {
-      message: applyMsg.value || null
-    })
-
-    console.log('✅ 申請成功:', response.data)
     alert('✅ 已送出申請！')
-    await load()
+    // 不要立刻呼叫 load()，避免又把剛設的狀態覆蓋掉
   } catch (e) {
-    console.error('💥 申請失敗:', e)
-    
+    // 6) 409 = 後端認定已申請過 → 同樣把畫面鎖住，避免再按
+    if (e.response?.status === 409) {
+      post.value.appliedByMe = true
+      alert('你已申請過了，請等待審核。')
+      return
+    }
     if (e.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
       router.push('/login')
       return
     }
-
-    if (e.response?.status === 409) {
-      alert('你已申請過了，請等待審核。')
+    if (e.response?.status === 404) {
+      alert('❌ 找不到貼文')
+      return
+    }
+    if (e.response?.status === 400 || e.response?.status === 403) {
+      alert(`❌ 申請失敗：${e.response?.data?.message || '請稍後再試'}`)
       return
     }
 
-    alert(`❌ 申請失敗: ${e.response?.data?.message || e.message}`)
+    // 其它未知錯誤（像你截圖的 "id is not defined" 就會到這裡）
+    console.error(e)
+    alert('❌ 申請失敗：發生例外錯誤')
+  } finally {
+    submitting.value = false
   }
 }
 
-async function cancelMyApplication() {
+async function cancelMyApplication () {
+  if (!post.value?.myPendingApplicationId) {
+    alert('找不到申請編號，請重新整理後再試')
+    return
+  }
+  if (!confirm('確定取消申請？')) return
+
   try {
-    if (!confirm('確定取消申請？')) return
-    
-    // ✅ 使用 http axios 實例
-    await http.delete(`/api/adopts/${post.value.id}/apply`)
-    
+    await http.patch(`/api/applications/${post.value.myPendingApplicationId}/cancel`)
+
+    // （可選）樂觀更新，不想 reload 就用這三行；想重載就改成 await load()
+    post.value.appliedByMe = false
+    post.value.myPendingApplicationId = null
+    if (typeof post.value.pendingApplications === 'number' && post.value.pendingApplications > 0) {
+      post.value.pendingApplications -= 1
+    }
+
     alert('✅ 已取消申請')
-    await load()
   } catch (e) {
-    console.error('💥 取消申請失敗:', e)
+    console.error('取消申請失敗', e)
     alert(`❌ 取消申請失敗: ${e.response?.data?.message || e.message}`)
   }
 }
@@ -502,5 +596,10 @@ watch(() => route.params.id || route.query.id, load)
 .adopt-view-page .alert-warning {
   border: none;
   background: #fff4e5;
+}
+
+.contact-text{
+  white-space: pre-line;         /* 把 \n 顯示成換行 */
+  overflow-wrap: anywhere;       /* Email 太長時也能自動斷行 */
 }
 </style>

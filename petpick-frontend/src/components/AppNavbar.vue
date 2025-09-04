@@ -31,7 +31,9 @@
                 <li>
                   <RouterLink class="dropdown-item" to="/post/adopt">刊登送養</RouterLink>
                 </li>
-                <!-- <li><RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink></li> -->
+                <li>
+                  <RouterLink class="dropdown-item" to="/adopt/report">收養回報</RouterLink>
+                </li>
               </ul>
             </li>
             <li class="nav-item">
@@ -54,7 +56,7 @@
               <RouterLink class="btn btn-material position-relative" to="/cart" aria-label="購物車" title="購物車">
                 <span class="material-icons">shopping_cart</span>
                 <span v-if="cart.itemsCount > 0"
-                  class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill"
+                  class="badge bg-danger position-absolute top-0 start-80 translate-middle rounded-pill"
                   style="min-width:20px;">{{ cart.itemsCount }}</span>
               </RouterLink>
             </template>
@@ -71,7 +73,7 @@
 
               <ul v-show="user.isLogin" class="dropdown-menu dropdown-menu-end shadow">
                 <li>
-                  <RouterLink class="dropdown-item" to="/adminOrders">後臺管理</RouterLink>
+                  <RouterLink class="dropdown-item" to="/adminOrders" target="_blank" rel="noopener noreferrer">後臺管理</RouterLink>
                 </li>
                 <li>
                   <RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink>

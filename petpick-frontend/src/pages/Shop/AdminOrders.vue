@@ -121,7 +121,7 @@
                                 </th>
                                 <th>訂單編號</th>
                                 <th>會員</th>
-                                <th>金額</th>
+                                <th>金額（含運）</th>
                                 <th>狀態</th>
                                 <th>配送</th>
                                 <th>下單時間</th>
@@ -143,12 +143,12 @@
                                     <div class="text-muted">{{ (o.merchantTradeNo || '').trim() }}</div>
                                 </td>
                                 <td>{{ o.receiverName || o.userName || (o.userId != null ? '#' + o.userId : '—') }}</td>
-                                <td>NT${{ (Number(o.totalPrice || o.total || 0)).toLocaleString('zh-Hant-TW') }}</td>
+                                <td>NT${{ fmtMoney(moneyTotalOf(o)) }}</td>
                                 <td class="td-status">
                                     <span class="badge me-1" :class="badgeCls(payStatusOf(o))">付款：{{ payStatusOf(o)
-                                    }}</span><br />
+                                        }}</span><br />
                                     <span class="badge" :class="badgeCls(deliveryStatusOf(o))">配送：{{ deliveryStatusOf(o)
-                                    }}</span>
+                                        }}</span>
                                 </td>
                                 <td class="td-delivery">{{ displayDelivery(o) }}</td>
                                 <td>{{ fmtDateTime(o.createdAt || o.date) }}</td>
@@ -158,8 +158,8 @@
                                     <button class="btn btn-sm btn-outline-secondary btn-compact"
                                         @click="onOpenStatus(o.orderId, o.status)">變更物流狀態</button>
                                     <button class="btn btn-sm btn-success btn-compact"
-                                        @click="onOpenMarkPaid(o.orderId, Number(o.totalPrice || o.total || 0))">付款</button>
-                                    <button class="btn btn-sm btn-info btn-compact"
+                                        @click="onOpenMarkPaid(o.orderId, moneyTotalOf(o))">付款</button> <button
+                                        class="btn btn-sm btn-info btn-compact"
                                         @click="onOpenLogistics(o.orderId)">物流</button>
                                     <button class="btn btn-sm btn-outline-danger btn-compact"
                                         @click="onOpenCancel(o.orderId)">取消</button>
@@ -182,7 +182,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-2 text-muted">訂單編號：<span class="font-mono">#{{ statusForm.orderId ?? '—'
-                        }}</span></div>
+                                }}</span></div>
                         <div class="mb-3">
                             <label class="form-label">狀態</label>
                             <select v-model="statusForm.status" class="form-select">
@@ -253,7 +253,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-2 text-muted">訂單編號：<span class="font-mono">#{{ logisticsForm.orderId ?? '—'
-                        }}</span></div>
+                                }}</span></div>
                         <div id="logisticsMeta" class="small text-muted mb-3" v-html="logisticsMetaHtml"></div>
                         <div class="row g-2">
                             <div class="col-6">
@@ -378,62 +378,88 @@ const pageWindowList = computed(() => {
 })
 
 // ===== API =====
-async function fetchOrders(p = 1, s = 10) {
-  try {
-    const { data } = await http.get(API_BASE, {
-      headers: ADMIN_HEADERS,
-      params: { page: p - 1, size: s } // 注意有些後端 page 從 0 開始
-    })
+async function fetchOrders(p = 1, s = 10, f = filters) {
+    try {
+        const { data } = await http.get(API_BASE, {
+            headers: ADMIN_HEADERS,
+            params: {
+                page: p,
+                size: s,
+                q: f.q || undefined,
+                status: f.status || undefined,
+                delivery: f.delivery || undefined,
+                dateFrom: f.dateFrom || undefined,
+                dateTo: f.dateTo || undefined,
+            },
+        })
 
-    // 如果後端回傳有 content，就取 content
-    if (Array.isArray(data.content)) {
-      totalPages.value = data.totalPages || 1
-      totalElements.value = data.totalElements || data.total || 0
-      size.value = data.size || s
-      page.value = (data.number || 0) + 1
-      return data.content
+        // 如果後端回傳有 content，就取 content
+        if (Array.isArray(data.content)) {
+            totalPages.value = data.totalPages || data.totalPage || data.pages || 1
+            totalElements.value = data.totalElements || data.total || 0
+            size.value = data.size || s
+
+            // ✅ 盡量相容各種命名；找不到時就用請求的 p
+            if (data.number != null) page.value = Number(data.number) + 1          // 一般 Spring 0-based
+            else if (data.page != null) page.value = Number(data.page)             // 1-based
+            else if (data.currentPage != null) page.value = Number(data.currentPage)
+            else page.value = p
+
+            return data.content
+        }
+
+        // 如果直接就是陣列
+        if (Array.isArray(data)) {
+            totalPages.value = 1
+            totalElements.value = data.length
+            return data
+        }
+
+        return []
+    } catch (err) {
+        console.error('讀取訂單列表失敗:', err)
+        throw new Error('讀取訂單列表失敗')
     }
-
-    // 如果直接就是陣列
-    if (Array.isArray(data)) {
-      totalPages.value = 1
-      totalElements.value = data.length
-      return data
-    }
-
-    return []
-  } catch (err) {
-    console.error('讀取訂單列表失敗:', err)
-    throw new Error('讀取訂單列表失敗')
-  }
 }
 
 
 async function apiGet(url) {
-  const { data } = await http.get(url, { headers: ADMIN_HEADERS })
-  if (data.ok === false) throw new Error(data.error || '查詢失敗')
-  return data
+    const { data } = await http.get(url, { headers: ADMIN_HEADERS })
+    if (data.ok === false) throw new Error(data.error || '查詢失敗')
+    return data
 }
 
 // ===== Load / Paging =====
 async function loadPage(p = 1) {
-  page.value = Math.max(1, p)
-  showLoading(true)
-  try {
-    orders.value = await fetchOrders()
-    lastRefreshed.value = new Date().toISOString()
-    selected.clear()
-  } catch (err) {
-    toast(`載入失敗：${escapeHtml(err.message || '')}`, 'danger')
-    orders.value = []
-  } finally {
-    showLoading(false)
-  }
+    page.value = Math.max(1, p)
+    showLoading(true)
+    try {
+        orders.value = await fetchOrders(page.value, size.value, filters)
+        lastRefreshed.value = new Date().toISOString()
+        selected.clear()
+    } catch (err) {
+        toast(`載入失敗：${escapeHtml(err.message || '')}`, 'danger')
+        orders.value = []
+    } finally {
+        showLoading(false)
+    }
 }
-function gotoPage(p) { if (Number.isFinite(p) && p >= 1 && p <= totalPages.value) loadPage(p) }
-function onSearch() { loadPage(1) }
-function onReset() { filters.q = filters.status = filters.delivery = filters.dateFrom = filters.dateTo = ''; loadPage(1) }
-
+function gotoPage(p) {
+    if (Number.isFinite(p) && p >= 1 && p <= totalPages.value) {
+        loadPage(p) // 這裡 loadPage 會把 page/size/filters 帶給 fetchOrders
+    }
+}
+function onSearch() {
+    loadPage(1) // 查詢重回第 1 頁
+}
+function onReset() {
+    filters.q = ''
+    filters.status = ''
+    filters.delivery = ''
+    filters.dateFrom = ''
+    filters.dateTo = ''
+    loadPage(1)
+}
 // ===== Row / Bulk =====
 function onRowSelect(id, checked) { checked ? selected.add(id) : selected.delete(id) }
 function toggleAll(checked) { orders.value.forEach(o => checked ? selected.add(o.orderId) : selected.delete(o.orderId)) }
@@ -468,7 +494,7 @@ async function onMarkPaid() {
                 orderIds: markPaidForm.ids,
                 gateway: markPaidForm.gateway || 'Manual',
                 tradeNo: markPaidForm.tradeNo || '',
-                paidAmount: Number(markPaidForm.paidAmount || 0)
+                paidAmount: num(amount)
             })
         } else if (markPaidForm.orderId) {
             await http.post(`${API_BASE}/${markPaidForm.orderId}/mark-paid`, { gateway: markPaidForm.gateway || 'Manual', tradeNo: markPaidForm.tradeNo || '', paidAmount: Number(markPaidForm.paidAmount || 0) })
@@ -483,22 +509,22 @@ function hideCancelModal() { cancelModal.hide() }
 async function onSaveCancel() {
     try {
         showLoading(true)
-if (cancelForm.ids.length > 0) {
-  await http.post(`${API_BASE}/bulk-status`, {
-    orderIds: cancelForm.ids,
-    status: 'Cancelled',
-    note: cancelForm.reason || ''
-  })
-  cancelModal.hide()
-  toast('已批次取消')
-} 
-else if (cancelForm.orderId) {
-  await http.post(`${API_BASE}/${cancelForm.orderId}/cancel`, {
-    reason: cancelForm.reason || ''
-  })
-  cancelModal.hide()
-  toast('訂單已取消')
-}
+        if (cancelForm.ids.length > 0) {
+            await http.post(`${API_BASE}/bulk-status`, {
+                orderIds: cancelForm.ids,
+                status: 'Cancelled',
+                note: cancelForm.reason || ''
+            })
+            cancelModal.hide()
+            toast('已批次取消')
+        }
+        else if (cancelForm.orderId) {
+            await http.post(`${API_BASE}/${cancelForm.orderId}/cancel`, {
+                reason: cancelForm.reason || ''
+            })
+            cancelModal.hide()
+            toast('訂單已取消')
+        }
         await loadPage(page.value)
     } catch (err) { toast(`取消失敗：${escapeHtml(err.message || '')}`, 'danger') }
     finally { showLoading(false) }
@@ -525,6 +551,12 @@ async function onOpenLogistics(id) {
                     try {
                         showLoading(true); const j = await queryTrackingFromEcpay(id); if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
                         const o2 = await fetchOrderOne(id); if (o2.trackingNo) { logisticsForm.trackingNo = o2.trackingNo; toast(`已取得追蹤碼：${escapeHtml(o2.trackingNo)}`) } else { toast('目前仍未提供追蹤碼，稍後可再試一次。', 'secondary') }
+                        if (o2.trackingNo && !['CANCELLED', 'FAILED', 'DELIVERED'].includes(String(o2.status || '').toUpperCase())) {
+                            await http.patch(`${API_BASE}/${id}/status`, {
+                                status: 'Shipped',
+                                note: 'Admin 查詢物流取得追蹤碼，自動轉已出貨'
+                            })
+                        }
                         try { await hydrateStatus() } catch { }
                     } catch (err) { toast(`查詢失敗：${escapeHtml(err.message || '')}`, 'danger') } finally { showLoading(false) }
                 }
@@ -551,39 +583,51 @@ async function onOpenLogistics(id) {
 function hideLogisticsModal() { logisticsModal.hide() }
 
 async function onSaveLogistics() {
-    const id = logisticsForm.orderId; if (!id) return
-   try {
-  showLoading(true)
-  const payload = {}
-  const lid = (logisticsForm.logisticsId || '').trim()
-  const tno = (logisticsForm.trackingNo || '').trim()
-  if (lid) payload.logisticsId = lid
-  if (tno) payload.trackingNo = tno
+    const id = logisticsForm.orderId
+    if (!id) return
+    try {
+        showLoading(true)
 
-  if (!Object.keys(payload).length) {
-    toast('沒有可更新的欄位', 'warning')
-    return
-  }
+        const payload = {}
+        const lid = (logisticsForm.logisticsId || '').trim()
+        const tno = (logisticsForm.trackingNo || '').trim()
+        if (lid) payload.logisticsId = lid
+        if (tno) payload.trackingNo = tno
 
-  await http.post(`${API_BASE}/${id}/logistics`, payload)
-  logisticsModal.hide()
-  toast('物流資訊已儲存')
-  await loadPage(page.value)
-} catch (err) {
-  toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger')
-} finally {
-  showLoading(false)
+        if (!Object.keys(payload).length) {
+            toast('沒有可更新的欄位', 'warning')
+            return
+        }
+
+        // 1) 先儲存物流資訊
+        await http.post(`${API_BASE}/${id}/logistics`, payload)
+
+        // 2) 若有填/帶入託運單號或追蹤碼，且目前狀態不是 Cancelled/Failed/Delivered，就自動改成 Shipped
+        const curr = String(logisticsForm._order?.status || '').toUpperCase()
+        if ((lid || tno) && !['CANCELLED', 'FAILED', 'DELIVERED'].includes(curr)) {
+            await http.patch(`${API_BASE}/${id}/status`, {
+                status: 'Shipped',
+                note: 'Admin 更新物流資訊自動轉已出貨'
+            })
+        }
+
+        logisticsModal.hide()
+        toast('物流資訊已儲存（狀態已切換為已出貨）')
+        await loadPage(page.value)
+    } catch (err) {
+        toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
-}
-
 // Logistics APIs
 async function queryTrackingFromEcpay(orderId) {
-  const { data } = await http.get(`/api/logistics/home/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
-  return data
+    const { data } = await http.get(`/api/logistics/home/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
+    return data
 }
 async function queryCvsFromEcpay(orderId) {
-  const { data } = await http.get(`/api/logistics/cvs/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
-  return data
+    const { data } = await http.get(`/api/logistics/cvs/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
+    return data
 }
 
 async function createHomeFor(orderId) {
@@ -591,13 +635,13 @@ async function createHomeFor(orderId) {
     try {
         showLoading(true)
         const base = await fetchOrderOne(orderId); const isCod = resolvePayMethod(base) === 'COD'
-const { data: j } = await http.post(
-  '/api/logistics/home/ecpay/create',
-  { orderId, isCod }, // body
-  { headers: ADMIN_HEADERS }
-)
-if (j.ok === false) throw new Error(j.error || '建立失敗')       
-if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
+        const { data: j } = await http.post(
+            '/api/logistics/home/ecpay/create',
+            { orderId, isCod }, // body
+            { headers: ADMIN_HEADERS }
+        )
+        if (j.ok === false) throw new Error(j.error || '建立失敗')
+        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
         const payload = {}; if (j.logisticsId) payload.logisticsId = j.logisticsId; if (j.trackingNo) payload.trackingNo = j.trackingNo
         if (Object.keys(payload).length) await http.post(`${API_BASE}/${orderId}/logistics`, payload)
         if (j.trackingNo) { toast(`宅配託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`); } else { toast('宅配託運單建立完成，追蹤碼尚未提供（將於回拋或查詢後自動更新）', 'warning'); await pollTracking(orderId, 6, 5000); }
@@ -612,12 +656,12 @@ async function createCvsForB2C(orderId) {
     if (!orderId) return
     try {
         showLoading(true)
-       const { data: j } = await http.post(
-  '/api/logistics/cvs/ecpay/create-b2c',
-  { orderId, subType: 'FAMI', isCollection: true },
-  { headers: ADMIN_HEADERS }
-)
-if (j.ok === false) throw new Error(j.error || '建立失敗')
+        const { data: j } = await http.post(
+            '/api/logistics/cvs/ecpay/create-b2c',
+            { orderId, subType: 'FAMI', isCollection: true },
+            { headers: ADMIN_HEADERS }
+        )
+        if (j.ok === false) throw new Error(j.error || '建立失敗')
 
         if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
         const payload = {}; if (j.logisticsId) payload.logisticsId = j.logisticsId; if (j.trackingNo) payload.trackingNo = j.trackingNo
@@ -660,17 +704,17 @@ async function hydrateStatus() {
 async function hydrateDelivery() { for (const row of orders.value) { try { Object.assign(row, await fetchOrderOne(row.orderId)) } catch { } } }
 
 async function fetchOrderOne(id) {
-  id = Number(id)
-  if (orderCache.has(id)) return orderCache.get(id)
+    id = Number(id)
+    if (orderCache.has(id)) return orderCache.get(id)
 
-  try {
-    const { data } = await http.get(`${API_BASE}/${id}`, { headers: ADMIN_HEADERS })
-    orderCache.set(id, data)
-    return data
-  } catch (err) {
-    console.error('讀取單筆訂單失敗:', err)
-    throw new Error('讀取單筆訂單失敗')
-  }
+    try {
+        const { data } = await http.get(`${API_BASE}/${id}`, { headers: ADMIN_HEADERS })
+        orderCache.set(id, data)
+        return data
+    } catch (err) {
+        console.error('讀取單筆訂單失敗:', err)
+        throw new Error('讀取單筆訂單失敗')
+    }
 }
 
 // ===== Export CSV =====
@@ -693,7 +737,7 @@ function collectRows() {
     return ordersSorted.value.map(o => {
         const id = `#${o.orderId}`, mtn = (o.merchantTradeNo || '').trim()
         const member = (o.receiverName || o.userName || (o.userId != null ? `#${o.userId}` : '—')).toString()
-        const amount = `NT$${Number(o.totalPrice || o.total || 0).toLocaleString('zh-Hant-TW')}`
+        const amount = `NT$${fmtMoney(moneyTotalOf(o))}`        
         const status = `付款：${payStatusOf(o)} 配送：${deliveryStatusOf(o)}`, delivery = displayDelivery(o), time = fmtDateTime(o.createdAt || o.date)
         return [id.replace(/^#/, ''), mtn, member, amount.replace(/^NT\$/, ''), status, delivery, time]
     })
@@ -701,9 +745,9 @@ function collectRows() {
 
 // ===== Utils =====
 function showLoading(isLoading) {
-  // TODO: 放 loading 動畫控制
-  console.log(isLoading ? '載入中...' : '載入完成')
-}function toast(message, type = 'success') {
+    // TODO: 放 loading 動畫控制
+    console.log(isLoading ? '載入中...' : '載入完成')
+} function toast(message, type = 'success') {
     const id = 't' + Math.random().toString(36).slice(2)
     const html = `<div id="${id}" class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="d-flex"><div class="toast-body">${message}</div>
@@ -778,6 +822,28 @@ function csvCell(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s
 function escapeHtml(s) { return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;') }
 async function safeText(r) { try { return await r.text() } catch { return `HTTP ${r.status}` } }
 function wait(ms) { return new Promise(res => setTimeout(res, ms)) }
+function num(x) {
+    const n = Number(x)
+    return Number.isFinite(n) ? n : 0
+}
+
+function moneyTotalOf(o) {
+    // 1) 先用後端可能已含運的欄位
+    const direct = [o.grandTotal, o.payable, o.amount, o.total, o.totalPrice]
+        .map(num).find(n => n > 0)
+    if (direct) return direct
+
+    // 2) 沒有就自己算：小計 + 運費 − 折扣（相容多種命名）
+    const items = num(o.itemsTotal ?? o.subtotal ?? o.itemsSubtotal ?? o.totalWithoutShipping)
+    const ship = num(o.shippingFee ?? o.shipping_fee ?? o.freight ?? o.shipping)
+    const disc = num(o.discount ?? o.discountAmount ?? o.couponDiscount)
+    return items + ship - disc
+}
+
+function fmtMoney(n) {
+    return num(n).toLocaleString('zh-Hant-TW')
+}
+
 </script>
 
 <style scoped>

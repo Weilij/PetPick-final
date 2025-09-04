@@ -2,7 +2,7 @@
   <div class="container-fluid">
     <div class="row">
       <!-- 側邊欄 -->
-      <AdminSidebar active="Admin" />
+      <AdminSidebar active="apply" />
 
 
       <!-- 主內容 -->
@@ -79,10 +79,10 @@
                 <div class="small mb-1">申請者：{{ a.applicantName || a.applicantUserId || '—' }}</div>
                 <div class="small mb-2">留言：{{ a.message || '—' }}</div>
                 <div class="d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-primary btn-sm" @click="openDetail(a.id)">詳情</button>
+                  <button class="btn btn-primary btn-sm btn-compact btn-detail" @click="openDetail(a.id)">詳情</button>
                   <template v-if="a.status === 'pending'">
-                    <button class="btn btn-success btn-sm" @click="approveApp(a.id)">通過</button>
-                    <button class="btn btn-danger btn-sm" @click="rejectApp(a.id)">退回</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="approveApp(a.id)">通過</button>
+                    <button class="btn btn-danger btn-sm btn-compact" @click="rejectApp(a.id)">退回</button>
                   </template>
                 </div>
               </div>
@@ -137,8 +137,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-danger" :disabled="modalData?.status !== 'pending'" @click="rejectApp(modalData?.id, true)">退回</button>
-          <button class="btn btn-success" :disabled="modalData?.status !== 'pending'" @click="approveApp(modalData?.id, true)">通過</button>
+          <button class="btn btn-danger btn-sm btn-compact" :disabled="modalData?.status !== 'pending'" @click="rejectApp(modalData?.id, true)">退回</button>
+          <button class="btn btn-success btn-sm btn-compact" :disabled="modalData?.status !== 'pending'" @click="approveApp(modalData?.id, true)">通過</button>
         </div>
       </div>
     </div>
@@ -165,6 +165,7 @@ const route = useRoute()
 const router = useRouter()
 
 // ---- 狀態 ----
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const fallback = '/images/no-image.jpg'
 
 const pageInfo = reactive({
@@ -304,10 +305,28 @@ function gotoPage(n) {
   load()
 }
 
-// 圖片挑選與錯誤處理
-function pickImg(post = {}) {
-  return post.image1 || post.image2 || post.image3 || fallback
+function imgUrl (path) {
+  if (!path) return fallback
+  if (/^https?:\/\//i.test(path)) return path               // 已是完整網址
+  const p = path.startsWith('/') ? path : '/' + path        // 相對 → 絕對
+  return API_BASE + p
 }
+
+function safeParseArray (v) {
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+
+// 卡片縮圖：支援 image1/2/3 + images(陣列/JSON字串)，並補完整網址
+function pickImg (post = {}) {
+  const candidates = [
+    post?.image1, post?.image2, post?.image3,
+    ...(Array.isArray(post?.images) ? post.images : []),
+    ...(typeof post?.images === 'string' ? safeParseArray(post.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  return candidates.length ? imgUrl(candidates[0]) : fallback
+}
+
 function onImgError(e) {
   e.target.src = fallback
 }
@@ -331,9 +350,14 @@ const modalLoading = ref(false)
 const modalData = ref(null)
 const modalPost = computed(() => modalData.value?.post || {})
 const modalImages = computed(() => {
-  const p = modalPost.value
-  const list = [p.image1, p.image2, p.image3].filter(u => !!u && String(u).trim())
-  return list.length ? list : [fallback]
+  const p = modalPost.value || {}
+  const list = [
+    p.image1, p.image2, p.image3,
+    ...(Array.isArray(p.images) ? p.images : []),
+    ...(typeof p.images === 'string' ? safeParseArray(p.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  return list.length ? list.map(imgUrl) : [fallback]
 })
 const modalTitle = computed(() => {
   const s = modalData.value?.status || 'pending'
@@ -506,4 +530,23 @@ onMounted(async () => {
 @media (max-width: 576px) {
   .carousel-img { height: 300px; }
 }
+
+/* 小按鈕統一尺寸：給詳情 / 通過 / 退回 / （以及 Modal 內） */
+.btn-compact{
+  padding: .35rem .7rem;
+  font-size: .875rem;       /* 約 14px */
+  border-radius: .5rem;
+}
+
+/* 只把「詳情」做成藍色（不影響搜尋按鈕） */
+.btn-detail{
+  background-color:#0d6efd !important;
+  border-color:#0d6efd !important;
+  color:#fff !important;
+}
+.btn-detail:hover{
+  background-color:#0b5ed7 !important;
+  border-color:#0a58ca !important;
+}
+
 </style>

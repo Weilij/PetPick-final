@@ -18,11 +18,5 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore(pinia)
 userStore.load()
 
-// 若你用 token 驗證，要一起設到 axios（用 cookie 的話可略）
-import axios from '@/utils/http'
-if (userStore.token) {
-  axios.defaults.headers.common.Authorization = `Bearer ${userStore.token}`
-}
-
 app.mount('#app')
 app.use(router)

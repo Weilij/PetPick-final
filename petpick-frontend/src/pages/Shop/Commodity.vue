@@ -490,8 +490,8 @@ async function addToCart(productId, quantity = 1) {
       Math.max(1, Number(quantity) || 1)
     )
     
-    console.log('✅ 已加入購物車:', productId)
-    showToast('✅ 商品已加入購物車！', 'success')
+    console.log('已加入購物車:', productId)
+    showToast(`<b>已加入購物車！</b>`, 'success')
     
   } catch (error) {
     console.error('❌ 加入購物車失敗:', error)
@@ -513,15 +513,17 @@ function showToast(message, type = 'success') {
   const toast = document.createElement('div')
   toast.className = `alert alert-${type} position-fixed`
   toast.style.cssText = `
-    top: 20px; 
+    top: 600px; 
     right: 20px; 
-    z-index: 9999; 
+    z-index: 2000; 
     min-width: 300px;
+    background-color: white;
+    border: solid 1.5px green;
+    text-align: center;
     animation: slideIn 0.3s ease-out;
   `
   toast.innerHTML = `
     ${message}
-    <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
   `
   
   document.body.appendChild(toast)

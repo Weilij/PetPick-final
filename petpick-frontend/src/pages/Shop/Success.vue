@@ -9,24 +9,24 @@
             <dt class="col-5 col-sm-3 text-sm-end fw-semibold">綠界訂單編號</dt>
             <dd class="col-7 col-sm-9 d-flex align-items-center">
               <span class="font-monospace">{{ displayOrderId || '—' }}</span>
-              <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
-                      @click="copy(displayOrderId)" :disabled="!displayOrderId">複製</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @click="copy(displayOrderId)"
+                :disabled="!displayOrderId">複製</button>
             </dd>
 
             <dt class="col-5 col-sm-3 text-sm-end fw-semibold">綠界交易序號</dt>
             <dd class="col-7 col-sm-9 d-flex align-items-center">
               <span class="font-monospace">{{ tradeNo || '—' }}</span>
-              <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
-                      @click="copy(tradeNo)" :disabled="!tradeNo">複製</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @click="copy(tradeNo)"
+                :disabled="!tradeNo">複製</button>
             </dd>
 
             <dt class="col-5 col-sm-3 text-sm-end fw-semibold">付款方式</dt>
             <dd class="col-7 col-sm-9"><span>{{ paymentType || '—' }}</span></dd>
 
-            <dt class="col-5 col-sm-3 text-sm-end fw-semibold">付款時間</dt>
+            <dt class="col-5 col-sm-3 text-sm-end fw-semibold">訂單建立時間</dt>
             <dd class="col-7 col-sm-9"><span>{{ payTime || '—' }}</span></dd>
 
-            <dt class="col-5 col-sm-3 text-sm-end fw-semibold">金額</dt>
+            <dt class="col-5 col-sm-3 text-sm-end fw-semibold">金額（含運）</dt>
             <dd class="col-7 col-sm-9"><span>{{ amountDisp || '—' }}</span></dd>
 
             <dt class="col-5 col-sm-3 text-sm-end fw-semibold">訊息</dt>
@@ -44,74 +44,83 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch, ref } from 'vue'
+import { computed, onMounted, watch, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/utils/http'
-
-
-// 可選：若你的專案有 Pinia 的購物車 store，可啟用以下兩行，優先用 store 刷徽章
-// import { useCartStore } from '@/stores/cart'
-// const cartStore = useCartStore()
+import { useCartStore } from '@/stores/cart'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const cartStore = useCartStore()
+const user = useUserStore()
 
-// ---- 參數與顯示欄位 ----
+// === 路由 Query ===
 const q = computed(() => route.query)
 
-// 若 ok 存在且非 "1"，按原本行為導到 fail 頁（你可調整路由名稱/路徑）
-onMounted(() => {
-  const ok = q.value.ok
-  if (ok && ok !== '1') {
-    // 若你有 /pay/fail 路由：
+// === 顯示用狀態 ===
+const mtn = ref('')   // MerchantTradeNo
+const tradeNo = ref('')
+const orderId = ref('')
+const paymentType = ref('')
+const payTime = ref('')
+const amount = ref(null) // number 或 null
+const msg = ref('交易成功')
+
+// 顯示欄位
+const displayOrderId = computed(() => mtn.value || orderId.value)
+const amountDisp = computed(() =>
+  amount.value == null ? '' : `NT$${Number(amount.value).toLocaleString('zh-Hant-TW')}`
+)
+const orderLink = computed(() => {
+  return orderId.value
+    ? { name: 'orderDetail', query: { id: String(orderId.value) } }
+    : { name: 'order' }
+})
+
+// ====== 生命周期 ======
+onMounted(async () => {
+  // 綠界成功：ok=1 或 RtnCode=1
+  const ok = q.value.ok || q.value.RtnCode
+  if (ok && String(ok) !== '1') {
     router.replace({ path: '/fail', query: q.value })
     return
   }
+
   fillFromQuery()
-  fallbackFill()
-  clearCartAndRefreshBadge()
+  await nextTick()
+  await fallbackFill()         // ★ 補齊「含運」金額/時間/付款方式
+  clearCartAndRefreshBadge()   // 清空購物車 + 刷新徽章
 })
 
-// 讀取參數 → 狀態
-const mtn       = ref('')  // MerchantTradeNo
-const tradeNo   = ref('')
-const orderId   = ref('')
-const paymentType = ref('')
-const payTime     = ref('')
-const amount      = ref(null) // number 或 null
-const msg         = ref('交易成功')
+// 監看 query 變動（保險）
+watch(() => route.query, () => fillFromQuery(), { deep: true })
 
-// 顯示欄位（字串）
-const displayOrderId = computed(() => mtn.value || orderId.value)
-const amountDisp     = computed(() =>
-  amount.value == null ? '' : `NT$${Number(amount.value).toLocaleString('zh-Hant-TW')}`
-)
-const orderLink = computed(() =>
-  orderId.value ? { name: 'orderDetail', params: { id: String(orderId.value) } } : { path: '/orders' }
-)
-
-// 監看路由 query 變化（例如第三方重導帶不同參數）
-watch(() => route.query, () => {
-  fillFromQuery()
-}, { deep: true })
-
+// ====== 讀取 Query → 狀態 ======
 function fillFromQuery() {
   const get = (k, d = '') => (q.value[k] ?? d)
 
-  mtn.value     = String(get('mtn') || get('MerchantTradeNo') || '')
+  mtn.value = String(get('mtn') || get('MerchantTradeNo') || '')
   tradeNo.value = String(get('tradeNo') || get('TradeNo') || '')
   orderId.value = String(get('orderId') || get('CustomField1') || '')
   paymentType.value = String(get('PaymentType') || '')
-  payTime.value     = String(get('PaymentDate') || '')
-  const tradeAmt    = get('TradeAmt')
+  payTime.value = String(get('PaymentDate') || '')
+
+  // 若前端 redirect 沒帶 TradeAmt，就留空，讓 fallbackFill 去算
+  const tradeAmt = get('TradeAmt')
   amount.value = tradeAmt !== undefined && tradeAmt !== '' ? Number(tradeAmt) : null
+
   msg.value = String(get('RtnMsg') || '交易成功')
 }
 
-function fmtDT(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d)) return iso
+function fmtDT(isoOrStr) {
+  if (!isoOrStr) return ''
+  const s = String(isoOrStr)
+  const normalized = s.includes('/') && s.includes(' ')
+    ? s.replaceAll('/', '-').replace(' ', 'T')
+    : s
+  const d = new Date(normalized)
+  if (isNaN(d)) return s
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -121,85 +130,110 @@ function fmtDT(iso) {
   return `${y}/${m}/${day} ${hh}:${mm}:${ss}`
 }
 
-// 後備：補付款方式 / 金額 / 時間
+const num = (x) => {
+  const n = Number(x)
+  return Number.isFinite(n) ? n : 0
+}
+
+// 後備：補「含運」金額 / 付款方式 / 時間
 async function fallbackFill() {
-  // A) 付款方式：用 checkout 頁存的 sessionStorage.last_payment
+  // 付款方式補值：checkout 頁可能存了 last_payment
   if (!paymentType.value) {
     const last = (sessionStorage.getItem('last_payment') || '').toLowerCase()
     const map = { credit: '信用卡', cod: '貨到付款', cash: '現金', webatm: '網路 ATM', cvs: '超商代碼' }
-    paymentType.value = map[last] || last.toUpperCase() || ''
+    paymentType.value = map[last] || (last ? last.toUpperCase() : '')
   }
 
-  // B) 金額/時間：打訂單 API 補
-  // B) 金額/時間：打訂單 API 補
-if ((!amount.value || !payTime.value) && orderId.value) {
-  try {
-    const r = await http.get(`/api/orders/${encodeURIComponent(orderId.value)}`)
-    const o = r.data
-    if (amount.value == null && o?.totalPrice != null) {
-      amount.value = Number(o.totalPrice)
-    }
-    const t = o?.paidAt || o?.createdAt
-    if (!payTime.value && t) {
-      payTime.value = fmtDT(t)
-    }
-    if (!paymentType.value && String(o?.status || '').toLowerCase() === 'paid') {
-      paymentType.value = '信用卡'
-    }
-  } catch {
-    /* ignore */
-  }
-}
-
-}
-
-// 複製功能
-async function copy(text) {
-  if (!text) return
-  try {
-    await navigator.clipboard.writeText(String(text))
-  } catch {
-    // 備援：舊瀏覽器
-    const ta = document.createElement('textarea')
-    ta.value = String(text)
-    ta.style.position = 'fixed'
-    ta.style.left = '-9999px'
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-  }
-}
-
-// 清空購物車 + 徽章刷新（與原生版一致，帶 Demo Header 也不影響）
-async function clearCartAndRefreshBadge() {
-  const uid = Number(sessionStorage.getItem('checkout_user_id')) || 1
-  const DEMO_HEADERS = { 'X-Demo-UserId': String(uid) }
-
-  async function tryDelete(url) {
+  // 金額/時間：以訂單 API 補齊
+  if ((!amount.value || !payTime.value) && orderId.value) {
     try {
-      await http.delete(url, { headers: DEMO_HEADERS })
-      return true
-    } catch { return false }
-  }
-  // 清空（新版 → 舊版 fallback）
-  await (tryDelete(`/api/cart/clear/${encodeURIComponent(uid)}`) ||
-         tryDelete(`/api/cart/user/${encodeURIComponent(uid)}`))
+      const r = await http.get(`/api/orders/${encodeURIComponent(orderId.value)}`)
+      const o = r.data || {}
 
-  // 優先用 Pinia 刷；若你沒有啟用 Pinia，則退回改 DOM（和你的舊做法相同）
+      // 1) 先嘗試直接用總額欄位（若後端已含運）
+      const directTotalCandidates = [
+        o.total, o.totalPrice, o.grandTotal, o.payable, o.amount
+      ].map(num).filter(n => n > 0)
+
+      if (!amount.value) {
+        if (directTotalCandidates.length > 0) {
+          amount.value = directTotalCandidates[0]
+        } else {
+          // 2) 沒有直接總額，就自己算：小計 + 運費 − 折扣
+          const items = num(o.itemsTotal ?? o.subtotal ?? o.itemsSubtotal ?? o.totalWithoutShipping)
+          const ship = num(o.shippingFee ?? o.shipping_fee ?? o.freight ?? o.shipping)
+          const disc = num(o.discount ?? o.discountAmount ?? o.couponDiscount)
+          amount.value = items + ship - disc
+        }
+      }
+
+      // 付款時間
+      const t = o?.paidAt || o?.paymentDate || o?.createdAt
+      if (!payTime.value && t) payTime.value = fmtDT(t)
+
+      // 付款方式（若後端有更精確）
+      if (!paymentType.value && o?.paymentMethod) paymentType.value = String(o.paymentMethod)
+    } catch {
+      // 無法補齊就保持原狀
+    }
+  }
+}
+
+// ====== 清空購物車 + 同步徽章 ======
+function broadcastCartUpdated() {
   try {
-    // 若你有 cartStore.refresh：
-    // await cartStore.refresh(uid)
-    // 若沒有 Pinia 或尚未掛載 Navbar，改回 DOM 版本：
-    const r = await http.get(`/api/cart/withProduct/${encodeURIComponent(uid)}`, { headers: DEMO_HEADERS })
-    const items = r.data
-    const badge = document.getElementById('cart-badge')
-    if (badge) badge.textContent = String(Array.isArray(items) ? items.length : 0)
-  } catch { /* ignore */ }
+    const bc = new BroadcastChannel('cart')
+    bc.postMessage({ type: 'cart:cleared', ts: Date.now() })
+    bc.close()
+  } catch {
+    localStorage.setItem('cart:cleared', String(Date.now()))
+  }
+}
+
+async function tryCall(...calls) {
+  for (const fn of calls) {
+    try { await fn(); return true } catch { }
+  }
+  return false
+}
+
+async function clearCartAndRefreshBadge() {
+  // 1) 先本地歸零
+  if (typeof cartStore.reset === 'function') {
+    cartStore.reset()
+  } else {
+    cartStore.items = []
+    cartStore.itemsCount = 0
+    cartStore.total = 0
+  }
+  broadcastCartUpdated()
+
+  // 2) 後端清空（嘗試多個常見端點以相容專案差異）
+  const uid = user?.userId
+  await tryCall(
+    () => http.post('/api/cart/clear'),
+    () => http.delete('/api/cart/clear'),
+    () => (uid ? http.post(`/api/cart/clear/${encodeURIComponent(uid)}`) : Promise.reject()),
+    () => (uid ? http.delete(`/api/cart/clear/${encodeURIComponent(uid)}`) : Promise.reject()),
+    () => (uid ? http.delete(`/api/cart/${encodeURIComponent(uid)}`) : Promise.reject())
+  )
+
+  // 3) 若有 refresh，最後再拉一次
+  if (uid && typeof cartStore.refresh === 'function') {
+    try { await cartStore.refresh(uid) } catch { }
+  }
+}
+
+// 小工具：複製
+function copy(text) {
+  if (!text) return
+  navigator.clipboard?.writeText(String(text)).then(() => { }, () => { })
 }
 </script>
 
 <style scoped>
-/* 依你的 success.css 習慣，這裡只放必要微調 */
-.card { border: none; border-radius: .75rem; }
+.card {
+  border: none;
+  border-radius: .75rem;
+}
 </style>

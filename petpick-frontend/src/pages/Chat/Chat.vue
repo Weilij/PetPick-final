@@ -54,6 +54,15 @@ import axios from '@/utils/http'
 import { useUserStore } from '@/stores/user'
 import Realtime from '@/common/realtime'   // 只負責 WS，不與 useRealtime 混用
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+function srcOf(u) {
+  if (!u) return null
+  const s = String(u)
+  if (/^https?:\/\//i.test(s)) return s
+  if (s.startsWith('/')) return API_BASE + s
+  return API_BASE + '/' + s
+}
+
 const user = useUserStore()
 const CURRENT_USER_ID = user.userId
 
@@ -306,8 +315,11 @@ async function fetchMissionCover(mid) {
     try {
         if (!mid) return 'https://picsum.photos/64/64'
         const { data } = await axios.get(`/api/missions/${mid}`)
-        return data.imageUrl || (Array.isArray(data.imageUrls) && data.imageUrls[0]) || 'https://picsum.photos/64/64'
-    } catch { return 'https://picsum.photos/64/64' }
+        const rel = data.imageUrl || (Array.isArray(data.imageUrls) && data.imageUrls[0])
+        return srcOf(rel) || 'https://picsum.photos/64/64'
+    } catch {
+        return 'https://picsum.photos/64/64'
+    }
 }
 
 function appendMessageRow(messageId, senderId, senderName, content, createdAt) {
