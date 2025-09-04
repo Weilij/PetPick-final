@@ -343,7 +343,7 @@ onMounted(async () => {
 .pet-card {
   display: flex;
   flex-direction: column;
-  height: 520px;                 /* ← 卡片統一高度，可自行微調 */
+  /* height: 0px; */                /* ← 卡片統一高度，可自行微調 */
   border: 1px solid #ddd;
   border-radius: 16px;
   overflow: hidden;
@@ -362,11 +362,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 6px;
 }
 .pet-img {
-  max-height: 100%;
-  max-width: 100%;
+  height: 100%;
+  width: 100%;
   object-fit: contain;
 }
 

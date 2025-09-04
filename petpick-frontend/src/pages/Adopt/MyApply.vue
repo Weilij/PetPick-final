@@ -129,8 +129,32 @@ const resultText = computed(() => {
   return `共 ${page.totalElements} 筆，第 ${page.number + 1}/${page.totalPages} 頁`
 })
 
+// === 圖片 URL 工具（統一處理） ===
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const fallback = '/images/no-image.jpg'
-const firstImg = (p) => p?.image1 || p?.image2 || p?.image3 || fallback
+
+function imgUrl (path) {
+  if (!path) return fallback
+  if (/^https?:\/\//i.test(path)) return path            // 已是完整網址
+  const p = path.startsWith('/') ? path : '/' + path     // 相對 → 絕對
+  return API_BASE + p
+}
+function safeParseArray (v) {
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+
+// 取代你的 firstImg：支援 image1/2/3 + images(陣列/JSON) 並補完整網址
+function firstImg (p = {}) {
+  const candidates = [
+    p?.image1, p?.image2, p?.image3,
+    ...(Array.isArray(p?.images) ? p.images : []),
+    ...(typeof p?.images === 'string' ? safeParseArray(p.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  const first = candidates[0]
+  return first ? imgUrl(first) : fallback
+}
+
 const place = (p) => [p?.city, p?.district].filter(Boolean).join(' ')
 const animalLine = (p) => [p?.species, p?.breed, p?.sex, p?.age, p?.bodyType].filter(Boolean).join('｜')
 const dt = (s) => s ? new Date(s).toLocaleString('zh-TW', { hour12: false }) : ''

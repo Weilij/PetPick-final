@@ -2,19 +2,8 @@
   <div class="container-fluid">
     <div class="row">
       <!-- 側邊欄 -->
-      <nav class="col-md-2 d-none d-md-block bg-light sidebar p-3">
-        <div class="position-sticky">
-          <h6 class="text-muted px-2 mb-3">後台選單</h6>
-          <ul class="nav flex-column gap-1">
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin-dashboard">後台首頁</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin-products">商品管理</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin-orders">訂單管理</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin-users">會員管理</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" :to="{ name:'PostReview' }">刊登審核</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" :to="{ name:'ApplyReview' }">申請審核</RouterLink></li>
-          </ul>
-        </div>
-      </nav>
+      <AdminSidebar active="Admin" />
+
 
       <!-- 主內容 -->
       <main class="col-md-10 ms-sm-auto px-md-4 py-4">
@@ -90,10 +79,10 @@
                 <div class="small mb-1">申請者：{{ a.applicantName || a.applicantUserId || '—' }}</div>
                 <div class="small mb-2">留言：{{ a.message || '—' }}</div>
                 <div class="d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-primary btn-sm" @click="openDetail(a.id)">詳情</button>
+                  <button class="btn btn-primary btn-sm btn-compact btn-detail" @click="openDetail(a.id)">詳情</button>
                   <template v-if="a.status === 'pending'">
-                    <button class="btn btn-success btn-sm" @click="approveApp(a.id)">通過</button>
-                    <button class="btn btn-danger btn-sm" @click="rejectApp(a.id)">退回</button>
+                    <button class="btn btn-success btn-sm btn-compact" @click="approveApp(a.id)">通過</button>
+                    <button class="btn btn-danger btn-sm btn-compact" @click="rejectApp(a.id)">退回</button>
                   </template>
                 </div>
               </div>
@@ -148,8 +137,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-danger" :disabled="modalData?.status !== 'pending'" @click="rejectApp(modalData?.id, true)">退回</button>
-          <button class="btn btn-success" :disabled="modalData?.status !== 'pending'" @click="approveApp(modalData?.id, true)">通過</button>
+          <button class="btn btn-danger btn-sm btn-compact" :disabled="modalData?.status !== 'pending'" @click="rejectApp(modalData?.id, true)">退回</button>
+          <button class="btn btn-success btn-sm btn-compact" :disabled="modalData?.status !== 'pending'" @click="approveApp(modalData?.id, true)">通過</button>
         </div>
       </div>
     </div>
@@ -166,6 +155,8 @@
 import { onMounted, ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Modal } from 'bootstrap'
+import AdminSidebar from '@/components/AppSideBar.vue'
+import http from '@/utils/http'
 // 如果你原本的 auth 在 /js/auth.js，建議在專案內改為 src/js/auth.js 再用下行匯入
 // 並提供 requireAdmin() 回傳 Promise，未授權就導回登入
 // import { requireAdmin } from '@/js/auth'
@@ -174,6 +165,7 @@ const route = useRoute()
 const router = useRouter()
 
 // ---- 狀態 ----
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const fallback = '/images/no-image.jpg'
 
 const pageInfo = reactive({
@@ -233,14 +225,19 @@ function buildQuery() {
   return q
 }
 
+// ✅ 使用 http 實例替代 fetch
 async function load() {
   loading.value = true
   try {
-    const params = new URLSearchParams(buildQuery()).toString()
-    const res = await fetch(`/api/applications?${params}`)
-    if (!res.ok) throw new Error('讀取失敗')
-    const data = await res.json()
-
+    console.log('🚀 載入申請資料，查詢參數:', buildQuery())
+    
+    const response = await http.get('/api/applications', {
+      params: buildQuery()
+    })
+    
+    console.log('📦 API 回應:', response.data)
+    
+    const data = response.data
     const arr = data.content ?? data ?? []
     items.value = arr
 
@@ -253,8 +250,33 @@ async function load() {
       pageInfo.totalElements = arr.length
       pageInfo.number = 0
     }
+    
+    console.log('✅ 載入完成:', {
+      總數: pageInfo.totalElements,
+      當前頁: pageInfo.number + 1,
+      總頁數: pageInfo.totalPages,
+      項目數: arr.length
+    })
+    
   } catch (e) {
-    console.error(e)
+    console.error('❌ 載入申請資料失敗:', e)
+    
+    // ✅ 更詳細的錯誤處理
+    if (e.response?.status === 401) {
+      console.error('🔐 認證失敗，需要重新登入')
+      alert('登入已過期，請重新登入')
+      router.push('/login')
+    } else if (e.response?.status === 403) {
+      console.error('🚫 權限不足')
+      alert('權限不足，無法存取此資源')
+    } else if (e.response?.status === 404) {
+      console.error('🔍 API 端點不存在')
+      alert('API 端點不存在，請檢查後端設定')
+    } else {
+      console.error('💥 其他錯誤:', e.response?.data || e.message)
+      alert('載入失敗，請稍後再試')
+    }
+    
     items.value = []
     pageInfo.totalPages = 0
     pageInfo.totalElements = 0
@@ -283,10 +305,28 @@ function gotoPage(n) {
   load()
 }
 
-// 圖片挑選與錯誤處理
-function pickImg(post = {}) {
-  return post.image1 || post.image2 || post.image3 || fallback
+function imgUrl (path) {
+  if (!path) return fallback
+  if (/^https?:\/\//i.test(path)) return path               // 已是完整網址
+  const p = path.startsWith('/') ? path : '/' + path        // 相對 → 絕對
+  return API_BASE + p
 }
+
+function safeParseArray (v) {
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+
+// 卡片縮圖：支援 image1/2/3 + images(陣列/JSON字串)，並補完整網址
+function pickImg (post = {}) {
+  const candidates = [
+    post?.image1, post?.image2, post?.image3,
+    ...(Array.isArray(post?.images) ? post.images : []),
+    ...(typeof post?.images === 'string' ? safeParseArray(post.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  return candidates.length ? imgUrl(candidates[0]) : fallback
+}
+
 function onImgError(e) {
   e.target.src = fallback
 }
@@ -310,9 +350,14 @@ const modalLoading = ref(false)
 const modalData = ref(null)
 const modalPost = computed(() => modalData.value?.post || {})
 const modalImages = computed(() => {
-  const p = modalPost.value
-  const list = [p.image1, p.image2, p.image3].filter(u => !!u && String(u).trim())
-  return list.length ? list : [fallback]
+  const p = modalPost.value || {}
+  const list = [
+    p.image1, p.image2, p.image3,
+    ...(Array.isArray(p.images) ? p.images : []),
+    ...(typeof p.images === 'string' ? safeParseArray(p.images) : []),
+  ].filter(u => typeof u === 'string' && u.trim())
+
+  return list.length ? list.map(imgUrl) : [fallback]
 })
 const modalTitle = computed(() => {
   const s = modalData.value?.status || 'pending'
@@ -328,16 +373,30 @@ function hideModal() {
   modalInst?.hide()
 }
 
+// ✅ 使用 http 實例替代 fetch
 async function openDetail(id) {
   modalLoading.value = true
   modalData.value = null
   showModal()
   try {
-    const res = await fetch(`/api/applications/${id}`)
-    if (!res.ok) throw new Error('讀取失敗')
-    modalData.value = await res.json()
+    console.log('🔍 載入申請詳情:', id)
+    
+    const response = await http.get(`/api/applications/${id}`)
+    modalData.value = response.data
+    
+    console.log('✅ 申請詳情載入成功:', response.data)
+    
   } catch (e) {
-    console.error(e)
+    console.error('❌ 載入申請詳情失敗:', e)
+    
+    if (e.response?.status === 404) {
+      alert('找不到該申請記錄')
+    } else if (e.response?.status === 403) {
+      alert('沒有權限查看此申請')
+    } else {
+      alert('載入詳情失敗，請稍後再試')
+    }
+    
     modalData.value = null
   } finally {
     modalLoading.value = false
@@ -345,32 +404,114 @@ async function openDetail(id) {
 }
 
 // ---- Admin Actions ----
+// ✅ 使用 http 實例替代 fetch
 async function approveApp(id, close = false) {
   if (!id) return
-  const ok = await fetch(`/api/applications/${id}/approve`, { method: 'PATCH' }).then(r => r.ok)
-  alert(ok ? '已通過' : '操作失敗')
-  if (ok) {
+  
+  try {
+    console.log('✅ 通過申請:', id)
+    
+    await http.patch(`/api/applications/${id}/approve`)
+    
+    alert('已通過')
+    console.log('✅ 申請通過成功')
+    
     if (close) hideModal()
     load()
+    
+  } catch (e) {
+    console.error('❌ 通過申請失敗:', e)
+    
+    if (e.response?.status === 404) {
+      alert('找不到該申請記錄')
+    } else if (e.response?.status === 403) {
+      alert('沒有權限執行此操作')
+    } else if (e.response?.status === 400) {
+      alert('申請狀態無法變更')
+    } else {
+      alert('操作失敗，請稍後再試')
+    }
   }
 }
+
+// ✅ 使用 http 實例替代 fetch
 async function rejectApp(id, close = false) {
   if (!id) return
+  
   const reason = window.prompt('退件原因（可留空）') || ''
-  const ok = await fetch(`/api/applications/${id}/reject?reason=${encodeURIComponent(reason)}`, { method: 'PATCH' }).then(r => r.ok)
-  alert(ok ? '已退回' : '操作失敗')
-  if (ok) {
+  
+  try {
+    console.log('🚫 拒絕申請:', id, '原因:', reason)
+    
+    await http.patch(`/api/applications/${id}/reject`, null, {
+      params: { reason }
+    })
+    
+    alert('已退回')
+    console.log('✅ 申請拒絕成功')
+    
     if (close) hideModal()
     load()
+    
+  } catch (e) {
+    console.error('❌ 拒絕申請失敗:', e)
+    
+    if (e.response?.status === 404) {
+      alert('找不到該申請記錄')
+    } else if (e.response?.status === 403) {
+      alert('沒有權限執行此操作')
+    } else if (e.response?.status === 400) {
+      alert('申請狀態無法變更')
+    } else {
+      alert('操作失敗，請稍後再試')
+    }
+  }
+}
+
+// ✅ 創建一個簡單的 requireAdmin 函數（如果沒有的話）
+async function requireAdmin() {
+  // 這裡應該檢查用戶是否為管理員
+  // 如果你有 auth store 或其他認證機制，請在這裡實作
+  try {
+    // 範例：檢查當前用戶角色
+    const response = await http.get('/api/auth/me')
+    const user = response.data
+    
+    if (user.role !== 'ADMIN' && user.role !== 'admin') {
+      alert('需要管理員權限才能存取此頁面')
+      router.push('/login')
+      throw new Error('權限不足')
+    }
+    
+    console.log('✅ 管理員權限驗證通過:', user.role)
+    return true
+    
+  } catch (e) {
+    console.error('❌ 權限驗證失敗:', e)
+    
+    if (e.response?.status === 401) {
+      alert('請先登入')
+      router.push('/login')
+    } else if (e.response?.status === 403) {
+      alert('權限不足')
+      router.push('/')
+    }
+    
+    throw e
   }
 }
 
 // ---- 權限保護 & 初次載入 ----
 onMounted(async () => {
-  await requireAdmin()
-  // 初始同步一次（避免無意義的 'all' 注入到 query）
-  syncRoute(false)
-  load()
+  try {
+    await requireAdmin()
+    // 初始同步一次（避免無意義的 'all' 注入到 query）
+    syncRoute(false)
+    load()
+  } catch (e) {
+    console.error('❌ 頁面初始化失敗:', e)
+    // 如果權限驗證失敗，不執行後續操作
+  }
 })
 </script>
 
@@ -389,4 +530,23 @@ onMounted(async () => {
 @media (max-width: 576px) {
   .carousel-img { height: 300px; }
 }
+
+/* 小按鈕統一尺寸：給詳情 / 通過 / 退回 / （以及 Modal 內） */
+.btn-compact{
+  padding: .35rem .7rem;
+  font-size: .875rem;       /* 約 14px */
+  border-radius: .5rem;
+}
+
+/* 只把「詳情」做成藍色（不影響搜尋按鈕） */
+.btn-detail{
+  background-color:#0d6efd !important;
+  border-color:#0d6efd !important;
+  color:#fff !important;
+}
+.btn-detail:hover{
+  background-color:#0b5ed7 !important;
+  border-color:#0a58ca !important;
+}
+
 </style>

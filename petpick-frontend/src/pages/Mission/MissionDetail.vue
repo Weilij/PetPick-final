@@ -11,12 +11,12 @@
                                 <div class="carousel-inner" id="carouselImages" style="border-radius: 15px;">
                                     <div v-for="(url, i) in images" :key="i" class="carousel-item"
                                         :class="{ active: i === currentIndex }">
-                                        <img :src="url || fallbackImg" class="d-block w-100"
-                                            style="height:700px;object-fit:cover;" @error="onImgError" alt="任務圖片" />
+                                        <img :src="srcOf(url)" class="d-block w-100"
+                                            style="height:350px;object-fit:cover;" @error="onImgError" alt="任務圖片" />
                                     </div>
                                 </div>
                                 <div id="imageThumbnails" class="d-flex justify-content-center mb-4 mt-2 flex-wrap">
-                                    <img v-for="(url, i) in images" :key="'thumb' + i" :src="url || fallbackImg"
+                                    <img v-for="(url, i) in images" :key="'thumb' + i" :src="srcOf(url)"
                                         class="img-thumbnail mx-1"
                                         :class="{ 'border-2 border-dark': i === currentIndex }"
                                         style="height:80px;width:80px;object-fit:cover;cursor:pointer"
@@ -98,7 +98,7 @@
 
                     <div class="card p-4 shadow-sm">
                         <div class="d-flex align-items-center mb-2">
-                            <img :src="m?.poster?.avatarUrl || fallbackImg" id="posterAvatar"
+                            <img :src="srcOf(m?.poster?.avatarUrl)" id="posterAvatar"
                                 class="rounded-circle me-3" style="width: 68px; height: 68px;" alt="頭像"
                                 @error="onImgError" />
                             <div>
@@ -157,7 +157,6 @@ const currentIndex = ref(0)
 const applying = ref(false)
 const loading = ref(false)
 const error = ref('')
-const fallbackImg = '/images/no-image.jpg'
 const presenceText = ref('⚪ 離線')
 const isFavorited = ref(false)
 const missionIdRef = ref(null)
@@ -191,7 +190,7 @@ onMounted(async () => {
     const arr = Array.isArray(response.data.imageUrls) && response.data.imageUrls.length ? response.data.imageUrls : []
     const first = response.data.imageUrl ? [response.data.imageUrl] : []
     const combined = [...first, ...arr].filter(Boolean)
-    images.value = combined.length ? combined : [fallbackImg]
+    images.value = combined.length ? combined : []
 
     await initFavoriteCheck()
     
@@ -388,6 +387,13 @@ function fmt(str) {
 }
 
 function onImgError(e) { 
-  e.target.src = fallbackImg 
+  e.target.src = srcOf(null) 
+}
+function srcOf(path) {
+  if (!path) return import.meta.env.VITE_API_BASE ? `${import.meta.env.VITE_API_BASE}/images/no-image.jpg` : 'http://localhost:8080/images/no-image.jpg'
+  // 已經是完整網址就直接回傳
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  // 拼上後端 API 的基礎網址
+  return `${import.meta.env.VITE_API_BASE || 'http://localhost:8080'}${path}`
 }
 </script>

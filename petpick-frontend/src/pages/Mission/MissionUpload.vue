@@ -135,7 +135,7 @@
                 <p class="mb-1"><strong>緊急聯絡人電話：</strong><span id="previewPhone">{{ form.contactPhone }}</span></p>
                 <p class="mb-1"><strong>地點：</strong><span id="previewLocation">{{ previewLocation }}</span></p>
                 <p class="mb-1"><strong>時間：</strong><span id="previewStartTime">{{ fmtPreview(form.startTimeRaw)
-                }}</span> ~ <span id="previewEndTime">{{ fmtPreview(form.endTimeRaw) }}</span></p>
+                    }}</span> ~ <span id="previewEndTime">{{ fmtPreview(form.endTimeRaw) }}</span></p>
                 <p class="mb-1"><strong>酬勞：</strong><span id="previewPrice">{{ form.price }}</span> 元</p>
                 <p class="card-text"><strong>任務詳情：</strong><span id="previewDescription">{{ form.description }}</span>
                 </p>
@@ -304,7 +304,7 @@ async function onSubmit() {
   // 檢查認證狀態
   if (!auth.value.loggedIn) {
     alert('❌ 請先登入才能上傳任務')
-    sessionStorage.setItem('redirect', '/mission/upload')
+    sessionStorage.setItem('redirect', '/missions/upload')
     router.push('/login')
     return
   }
@@ -345,26 +345,25 @@ async function onSubmit() {
   submitting.value = true
   try {
     console.log('🚀 開始上傳任務:', payload)
-    
-    // ✅ 使用 http axios 實例，會自動帶 JWT token
+
     const response = await http.post('/api/missions/upload', fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    
+
     console.log('✅ 上傳成功:')
     alert('✅ 上傳成功')
-    
+
     // 可視需要清空表單或導向其他頁面
     resetForm()
     // router.push('/missions') // 導向任務列表頁面
-    
+
   } catch (err) {
     console.error('💥 上傳失敗:', err)
-    
+
     if (err.response?.status === 401) {
       alert('❌ 認證已過期，請重新登入')
       localStorage.removeItem('auth')
-      sessionStorage.setItem('redirect', '/mission/upload')
+      sessionStorage.setItem('redirect', '/missions/upload')
       router.push('/login')
     } else if (err.response?.status === 400) {
       alert(`❌ 資料格式錯誤: ${err.response?.data?.message || '請檢查填寫內容'}`)

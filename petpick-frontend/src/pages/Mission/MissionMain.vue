@@ -59,7 +59,7 @@
             <div class="row">
               <div class="col-12 mb-4" v-for="m in VIEW" :key="m.missionId">
                 <div class="d-flex border shadow-sm p-3 align-items-start" style="border-radius: 15px;">
-                  <img :src="m.imageUrl || FALLBACK_IMG" alt="任務圖片" @error="$event.target.src = FALLBACK_IMG"
+                  <img :src="srcOf(m.imageUrl)" alt="任務圖片" @error="$event.target.src = FALLBACK_IMG"
                     style="width:250px;height:200px;object-fit:cover" class="me-3" loading="lazy">
                   <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-center">
@@ -85,7 +85,7 @@
           <div id="recommend-list" class="row" v-show="showRecommend">
             <div class="col-12 mb-4" v-for="m in VIEW.filter(x => (Number(x.score) || 0) >= 70)" :key="m.missionId">
               <div class="d-flex border shadow-sm p-3 align-items-start" style="border-radius: 15px;">
-                <img :src="m.imageUrl || FALLBACK_IMG" alt="任務圖片" @error="$event.target.src = FALLBACK_IMG"
+                <img :src="srcOf(m.imageUrl)" alt="任務圖片" @error="$event.target.src = FALLBACK_IMG"
                   style="width:250px;height:200px;object-fit:cover" class="me-3" loading="lazy">
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between align-items-center">
@@ -183,6 +183,15 @@ const ALL = ref([])
 const VIEW = ref([])
 
 const FALLBACK_IMG = '/images/no-image.jpg'
+
+function srcOf(path) {
+  if (!path) return FALLBACK_IMG
+  // 已經是完整網址就直接回傳
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  // 拼上後端 API 的基礎網址
+  return `${import.meta.env.VITE_API_BASE || 'http://localhost:8080'}${path}`
+}
+
 
 // 載入任務
 onMounted(async () => {

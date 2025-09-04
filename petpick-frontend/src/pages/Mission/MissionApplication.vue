@@ -38,8 +38,13 @@
           <div v-for="m in listToRender" :key="m.missionId" class="card mb-3">
             <div class="card-body">
               <div class="d-flex">
-                <img :src="m.imageUrl || fallbackImg" alt="封面" class="me-3"
-                  style="width:160px;height:120px;object-fit:cover;border-radius:8px" @error="onImgErr" />
+                <img
+                  :src="srcOf(m.imageUrl)"
+                  alt="封面"
+                  class="me-3"
+                  style="width:160px;height:120px;object-fit:cover;border-radius:8px"
+                  @error="onImgErr"
+                />
 
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between align-items-start">
@@ -84,9 +89,9 @@
                           電話：{{ a.contactPhone || '' }}　申請時間：{{ fmt(a.applyTime) }}
                         </div>
                         <div class="d-flex gap-2">
-                          <button class="btn btn-sm btn-success" :disabled="a.status !== 'pending'"
+                          <button class="btn btn-sm btn-success" :disabled="a.status !== 'PENDING'"
                             @click="ownerDecision(a.applicationId, 'accepted', m.missionId)">同意</button>
-                          <button class="btn btn-sm btn-outline-danger" :disabled="a.status !== 'pending'"
+                          <button class="btn btn-sm btn-outline-danger" :disabled="a.status !== 'PENDING'"
                             @click="ownerDecision(a.applicationId, 'rejected', m.missionId)">拒絕</button>
                         </div>
                       </div>
@@ -120,7 +125,7 @@
                   :to="{ name: 'missionDetail', params: { id: app.missionId } }">
                   查看任務
                 </RouterLink>
-                <button v-if="app.status === 'pending'" class="btn btn-sm text-white"
+                <button v-if="app.status === 'PENDING'" class="btn btn-sm text-white"
                   style="background-color:rgb(219,120,120)" @click="onCancel(app.applicationId)">取消申請</button>
               </div>
             </div>
@@ -140,288 +145,207 @@ import { useUserStore } from '@/stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 
-// 使用 store 的認證狀態
+// 認證狀態
 const auth = computed(() => ({
   loggedIn: userStore.isLogin,
-  role: userStore.role,
-  uid: userStore.userId
+  uid: userStore.userId,
+  token: userStore.token
 }))
+function currentUserId() { return auth.value.uid || null }
 
-function currentUserId() { 
-  return auth.value.uid || null
+// 圖片來源（靜態檔走 8080）
+const fallbackImg = '/images/no-image.jpg'
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+function srcOf(p) {
+  if (!p) return fallbackImg
+  if (/^https?:\/\//i.test(p)) return p
+  return API_BASE + (p.startsWith('/') ? p : '/' + p)
 }
 
-const fallbackImg = '/images/no-image.jpg'
+// ===== 這區等同你原本的 API 常數（用函式帶入 uid） =====
+const API = {
+  ownerMissions: (uid) => `/api/owners/${uid}/missions`,
+  ownerApps:     (uid) => `/api/missionapplications/me/owner?userId=${uid}`,
+  myApplied:     (uid) => `/api/missionapplications/me/applicant?userId=${uid}`,
+  accept:  (uid, appId) => `/api/missionapplications/${appId}/status?ownerId=${uid}&status=ACCEPTED`,
+  reject:  (uid, appId) => `/api/missionapplications/${appId}/status?ownerId=${uid}&status=REJECTED`,
+  cancel:  (uid, appId) => `/api/missionapplications/${appId}?applicantId=${uid}`,
+  delMission: (uid, mid) => `/api/missions/${mid}?posterId=${uid}`
+}
 
-// UI 狀態
+// ===== UI 狀態 =====
 const activeTab = ref('all')
-const loading = ref(false)
-const error = ref('')
+const loading   = ref(false)
+const error     = ref('')
 
-// 資料集
-const allMissions = ref([])   // 我發佈的
+// 資料集（對應你原本的 MY_MISSIONS / OWNER_APPS / MY_APPS）
+const allMissions = ref([])   // 我發佈
 const ownerApps   = ref([])   // 收到的申請
-const myApplied   = ref([])   // 我申請出去的
-const openSet     = ref(new Set()) // 控制申請者面板展開
+const myApplied   = ref([])   // 我申請的
 
+// 申請者面板展開
+const openSet = ref(new Set())
+function toggleApplicants(mid){ const s = new Set(openSet.value); s.has(mid)?s.delete(mid):s.add(mid); openSet.value=s }
+function isApplicantsOpen(mid){ return openSet.value.has(mid) }
+function appsByMission(missionId){ return ownerApps.value.filter(a => String(a.missionId) === String(missionId)) }
+
+// 掛載
 onMounted(async () => {
-  if (!auth.value.loggedIn) {
-    error.value = '請先登入才能查看任務控制台'
-    return
-  }
+  if (!auth.value.loggedIn) { error.value = '請先登入才能查看任務控制台'; return }
   await loadAll()
 })
 
+// 載入全部清單（等同 init -> 3 隻並發）
 async function loadAll() {
   loading.value = true
   error.value = ''
   const uid = currentUserId()
-
-  if (!uid) {
-    error.value = '無法取得用戶資訊，請重新登入'
-    loading.value = false
-    return
-  }
+  if (!uid) { error.value = '無法取得用戶資訊，請重新登入'; loading.value = false; return }
 
   try {
-    console.log('🚀 開始載入任務控制台資料，用戶 ID:', uid)
-
-    const [missionsRes, ownerRes, applicantRes] = await Promise.all([
-      http.get(`/api/owners/${uid}/missions`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }),
-      http.get(`/api/missionapplications/me/owner`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        params: { userId: uid }
-      }),
-      http.get(`/api/missionapplications/me/applicant`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        params: { userId: uid }
-      })
+    const [mRes, oRes, aRes] = await Promise.allSettled([
+      http.get(API.ownerMissions(uid)),
+      http.get(API.ownerApps(uid)),
+      http.get(API.myApplied(uid))
     ])
 
-    // 存入 reactive 狀態
-    allMissions.value = Array.isArray(missionsRes.data) ? missionsRes.data : []
-    ownerApps.value   = Array.isArray(ownerRes.data) ? ownerRes.data : []
-    myApplied.value   = Array.isArray(applicantRes.data) ? applicantRes.data : []
+    if (mRes.status === 'fulfilled') {
+      allMissions.value = Array.isArray(mRes.value.data) ? mRes.value.data : []
+    } else {
+      console.warn('[ownerMissions] 載入失敗：', mRes.reason)
+      allMissions.value = []
+    }
 
-    console.log('📦 Missions:', allMissions.value)
-    console.log('📦 As Owner:', ownerApps.value)
-    console.log('📦 As Applicant:', myApplied.value)
+    if (oRes.status === 'fulfilled') {
+      ownerApps.value = Array.isArray(oRes.value.data) ? oRes.value.data : []
+    } else {
+      console.warn('[ownerApps] 載入失敗：', oRes.reason)
+      ownerApps.value = []
+    }
 
-    console.log('✅ 任務控制台資料載入完成:', {
-      myMissions: allMissions.value.length,
-      receivedApps: ownerApps.value.length,
-      myApps: myApplied.value.length
-    })
+    if (aRes.status === 'fulfilled') {
+      myApplied.value = Array.isArray(aRes.value.data) ? aRes.value.data : []
+    } else {
+      console.warn('[myApplied] 載入失敗：', aRes.reason)
+      myApplied.value = []
+    }
   } catch (e) {
-    console.error('💥 載入任務控制台失敗:', e)
-
-    if (e.response?.status === 401) {
+    console.error('載入失敗（總攔截）', e)
+    if (e?.response?.status === 401) {
       error.value = '認證已過期，請重新登入'
       localStorage.removeItem('auth')
       router.push('/login')
-    } else if (e.response?.status === 403) {
-      error.value = '沒有權限查看任務控制台'
-    } else {
-      error.value = e.response?.data?.message || e.message || '載入失敗'
     }
   } finally {
     loading.value = false
   }
 }
 
-
-// 對應 getOngoing / getAll / getApplied
+// ===== 與你原本相同的「三個面板邏輯」 =====
 const ongoingMissions = computed(() => allMissions.value.filter(m => toInt(m.pendingCount) > 0 && !toBool(m.hasAccepted)))
-const listToRender = computed(() => activeTab.value==='ongoing' ? ongoingMissions.value : allMissions.value)
+const listToRender = computed(() => activeTab.value === 'ongoing' ? ongoingMissions.value : allMissions.value)
 
-// 小工具（保持與原實作一致）
-function tagLine(tags){ return Array.isArray(tags) && tags.length ? tags.map(t=>`#${t}`).join(' ') : '無標籤' }
-function toInt(n){ return Number.isFinite(+n) ? +n : 0 }
-function toBool(v){ return String(v)==='true' || v===true || v===1 }
-function fmt(s){ 
+// 小工具（保留你的實作）
+function tagLine(tags){ return Array.isArray(tags)&&tags.length ? tags.map(t=>`#${t}`).join(' ') : '無標籤' }
+function toInt(n){ return Number.isFinite(+n)?+n:0 }
+function toBool(v){ return String(v)==='true'||v===true||v===1 }
+function fmt(s){
   if(!s) return ''
-  try {
-    const d = new Date(String(s).replace(' ','T'))
-    const pad=n=>String(n).padStart(2,'0')
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}` 
-  } catch (err) {
-    console.error('💥 時間格式化失敗:', err, s)
-    return '時間格式錯誤'
-  }
+  try{
+    const d=new Date(String(s).replace(' ','T')); const pad=n=>String(n).padStart(2,'0')
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }catch{ return '時間格式錯誤' }
 }
 function onImgErr(e){ e.target.src = fallbackImg }
 function badgeClass(m){ return toBool(m.hasAccepted) ? 'bg-success' : (toInt(m.pendingCount)>0 ? 'bg-warning' : 'bg-secondary') }
 function badgeText(m){ return toBool(m.hasAccepted) ? '已配對' : (toInt(m.pendingCount)>0 ? '待審中' : '未有申請') }
 
-// 申請者面板
-function toggleApplicants(mid){
-  const s = new Set(openSet.value)
-  if (s.has(mid)) s.delete(mid); else s.add(mid)
-  openSet.value = s
-}
-function isApplicantsOpen(mid){ return openSet.value.has(mid) }
-// 依 missionId 找申請者
-function appsByMission(missionId) {
-  return ownerApps.value.filter(app => app.missionId === missionId)
-}
-
-// // 切換申請者清單顯示
-// function toggleApplicants(missionId) {
-//   applicantsVisible.value[missionId] = !applicantsVisible.value[missionId]
-// }
-// 操作：刪除任務
+// ===== 操作：刪除任務（對應 btn-del -> API.delMission）=====
 async function onDeleteMission(mid){
   if(!confirm('確定刪除此任務？此動作無法復原')) return
   const uid = currentUserId()
-  
-  if (!uid) {
-    alert('❌ 無法取得用戶資訊')
-    return
-  }
-  
-  try {
-    console.log('🚀 開始刪除任務:', mid)
-    
-    // ✅ 使用 http axios 實例，會自動帶 JWT token
-    await http.delete(`/api/missions/${mid}`, { params: { posterId: uid } })
-    
+  if(!uid){ alert('❌ 無法取得用戶資訊'); return }
+
+  try{
+    await http.delete(API.delMission(uid, mid))
     allMissions.value = allMissions.value.filter(x => String(x.missionId) !== String(mid))
     ownerApps.value   = ownerApps.value.filter(x => String(x.missionId) !== String(mid))
-    
-    console.log('✅ 任務刪除成功')
     alert('✅ 任務已刪除')
-    
-  } catch(e) {
-    console.error('💥 刪除任務失敗:', e)
-    
-    if (e.response?.status === 401) {
-      alert('❌ 認證已過期，請重新登入')
-      localStorage.removeItem('auth')
-      router.push('/login')
-    } else if (e.response?.status === 403) {
-      alert('❌ 沒有權限刪除此任務')
-    } else if (e.response?.status === 404) {
-      alert('❌ 找不到此任務')
-    } else {
-      alert(`❌ 刪除失敗: ${e.response?.data?.message || e.message}`)
-    }
+  }catch(e){
+    console.error('刪除任務失敗', e)
+    if (e.response?.status === 401) { alert('❌ 認證已過期，請重新登入'); localStorage.removeItem('auth'); router.push('/login') }
+    else if (e.response?.status === 403) alert('❌ 沒有權限刪除此任務')
+    else if (e.response?.status === 404) alert('❌ 找不到此任務')
+    else alert(`❌ 刪除失敗: ${e.response?.data?.message || e.message}`)
   }
 }
 
-// 操作：同意/拒絕申請（對應 ownerDecision）
+// ===== 操作：同意/拒絕（對應 ownerDecision -> API.accept/reject）=====
 async function ownerDecision(appId, action, missionId){
-  const actionText = action === 'accepted' ? '同意' : '拒絕'
-  if(!confirm(`確定${actionText}此申請？`)) return
-  
+  const yes = confirm(action === 'accepted' ? '確定同意此申請？' : '確定拒絕此申請？')
+  if(!yes) return
   const uid = currentUserId()
-  
-  if (!uid) {
-    alert('❌ 無法取得用戶資訊')
-    return
-  }
-  
-  try {
-    console.log('🚀 開始處理申請:', { appId, action, missionId })
-    
-    // ✅ 使用 http axios 實例，會自動帶 JWT token
-    await http.patch(`/api/missionapplications/${appId}/status`, null, { 
-      params: { ownerId: uid, status: action } 
-    })
+  if(!uid){ alert('❌ 無法取得用戶資訊'); return }
 
+  const url = action === 'accepted' ? API.accept(uid, appId) : API.reject(uid, appId)
+  const serverStatus = action === 'accepted' ? 'ACCEPTED' : 'REJECTED'
+
+  try{
+    await http.patch(url)
     // 更新 ownerApps 狀態
-    ownerApps.value = ownerApps.value.map(a => 
-      a.applicationId === +appId ? { ...a, status: action } : a
-    )
+    ownerApps.value = ownerApps.value.map(a => a.applicationId === +appId ? { ...a, status: serverStatus } : a)
 
-    if(action === 'accepted'){
-      // 標記任務為已配對
-      allMissions.value = allMissions.value.map(m => 
-        String(m.missionId) === String(missionId) 
-          ? { ...m, hasAccepted: true, pendingCount: 0 } 
-          : m
+    if (serverStatus === 'ACCEPTED') {
+      allMissions.value = allMissions.value.map(m =>
+        String(m.missionId) === String(missionId) ? { ...m, hasAccepted: true, pendingCount: 0 } : m
       )
     } else {
-      // 拒絕則 pendingCount -1
-      allMissions.value = allMissions.value.map(m => 
-        String(m.missionId) === String(missionId) 
-          ? { ...m, pendingCount: Math.max(0, toInt(m.pendingCount) - 1) } 
+      allMissions.value = allMissions.value.map(m =>
+        String(m.missionId) === String(missionId)
+          ? { ...m, pendingCount: Math.max(0, toInt(m.pendingCount) - 1) }
           : m
       )
     }
-    
-    console.log('✅ 申請處理成功')
-    alert(`✅ 已${actionText}申請`)
-    
-  } catch(e) {
-    console.error('💥 處理申請失敗:', e)
-    
-    if (e.response?.status === 401) {
-      alert('❌ 認證已過期，請重新登入')
-      localStorage.removeItem('auth')
-      router.push('/login')
-    } else if (e.response?.status === 403) {
-      alert('❌ 沒有權限處理此申請')
-    } else if (e.response?.status === 404) {
-      alert('❌ 找不到此申請')
-    } else {
-      alert(`❌ 操作失敗: ${e.response?.data?.message || e.message}`)
-    }
+    alert(`✅ 已${serverStatus === 'ACCEPTED' ? '同意' : '拒絕'}申請`)
+  }catch(e){
+    console.error('處理申請失敗', e)
+    if (e.response?.status === 401) { alert('❌ 認證已過期，請重新登入'); localStorage.removeItem('auth'); router.push('/login') }
+    else if (e.response?.status === 403) alert('❌ 沒有權限處理此申請')
+    else if (e.response?.status === 404) alert('❌ 找不到此申請')
+    else alert(`❌ 操作失敗: ${e.response?.data?.message || e.message}`)
   }
 }
 
-// 操作：取消我送出的申請
+// ===== 操作：取消我送出的申請（對應 btn-cancel -> API.cancel）=====
 async function onCancel(appId){
   if(!confirm('確定取消這筆申請？')) return
   const uid = currentUserId()
-  
-  if (!uid) {
-    alert('❌ 無法取得用戶資訊')
-    return
-  }
-  
-  try {
-    console.log('🚀 開始取消申請:', appId)
-    
-    // ✅ 使用 http axios 實例，會自動帶 JWT token
-    await http.delete(`/api/missionapplications/${appId}`, { 
-      params: { applicantId: uid } 
-    })
-    
+  if(!uid){ alert('❌ 無法取得用戶資訊'); return }
+
+  try{
+    await http.delete(API.cancel(uid, appId))
     myApplied.value = myApplied.value.filter(x => x.applicationId !== appId)
-    
-    console.log('✅ 申請取消成功')
     alert('✅ 申請已取消')
-    
-  } catch(e) {
-    console.error('💥 取消申請失敗:', e)
-    
-    if (e.response?.status === 401) {
-      alert('❌ 認證已過期，請重新登入')
-      localStorage.removeItem('auth')
-      router.push('/login')
-    } else if (e.response?.status === 403) {
-      alert('❌ 沒有權限取消此申請')
-    } else if (e.response?.status === 404) {
-      alert('❌ 找不到此申請')
-    } else {
-      alert(`❌ 取消失敗: ${e.response?.data?.message || e.message}`)
-    }
+  }catch(e){
+    console.error('取消申請失敗', e)
+    if (e.response?.status === 401) { alert('❌ 認證已過期，請重新登入'); localStorage.removeItem('auth'); router.push('/login') }
+    else if (e.response?.status === 403) alert('❌ 沒有權限取消此申請')
+    else if (e.response?.status === 404) alert('❌ 找不到此申請')
+    else alert(`❌ 取消失敗: ${e.response?.data?.message || e.message}`)
   }
 }
 
-// 狀態徽章工具（文字/樣式）
-function statusText(s){ 
-  if(s==='accepted') return '同意'
-  if(s==='pending') return '等待對方回覆'
-  if(s==='rejected') return '已拒絕'
+// ===== 狀態顯示（改為後端 enum 大寫）=====
+function statusText(s){
+  if(s==='ACCEPTED') return '同意'
+  if(s==='PENDING')  return '等待對方回覆'
+  if(s==='REJECTED') return '已拒絕'
   return '已取消'
 }
-function statusClass(s){ 
-  if(s==='accepted') return 'bg-success'
-  if(s==='pending') return 'bg-warning'
-  if(s==='rejected') return 'bg-danger'
+function statusClass(s){
+  if(s==='ACCEPTED') return 'bg-success'
+  if(s==='PENDING')  return 'bg-warning'
+  if(s==='REJECTED') return 'bg-danger'
   return 'bg-secondary'
 }
 </script>

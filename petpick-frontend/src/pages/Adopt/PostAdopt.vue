@@ -254,7 +254,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import http from '@/utils/http'
@@ -289,6 +289,46 @@ const form = reactive({
   requireContract: 'false',
   requireFollowup: 'false'
 })
+
+// ==== 自動帶入登入者資訊（先從 store，沒有再打 API）====
+const prefilled = ref(false)
+
+// 先從 Pinia store 帶（依你 store 的欄位名稱改一下）
+function prefillFromStore () {
+  if (!auth.value.loggedIn) return
+  const n = userStore.username || userStore.name || ''
+  const p = userStore.phonenumber || userStore.phone || userStore.mobile || ''
+
+  if (!form.contactName && n)   form.contactName  = n
+  if (!form.contactPhone && p)  form.contactPhone = p
+
+  // ✅ 兩個都有才標記完成，避免擋掉 API 補值
+  prefilled.value = !!(form.contactName && form.contactPhone)
+}
+
+// 如果 store 沒資料，就向後端拿
+async function prefillFromApi () {
+  if (!auth.value.loggedIn) return
+  // ✅ 只有缺資料才打
+  const need = !form.contactName || !form.contactPhone || !form.contactLine
+  if (!need) return
+
+  try {
+    const { data } = await http.get('/api/user/me')  // 你後端是 /api/user/me
+    const n = data?.username || data?.name || ''
+    const p = data?.phonenumber || data?.phone || data?.mobile || ''
+    const l = data?.lineId || data?.line || ''
+
+    if (!form.contactName && n)   form.contactName  = n
+    if (!form.contactPhone && p)  form.contactPhone = p
+    if (!form.contactLine && l)   form.contactLine  = l
+
+    // 這行可有可無：給你看 API 回了什麼
+    // console.log('me:', data)
+  } catch (e) {
+    console.warn('載入會員資料失敗（可忽略）', e)
+  }
+}
 
 // ===== 行政區 =====
 const areas = ref([]) // [{name, districts:[]}]
@@ -329,8 +369,8 @@ async function doUpload(e){
     console.log('🚀 開始上傳圖片到 slot:', uploadSlot.value)
     
     // ✅ 使用 http axios 實例，會自動帶 JWT token
-    const response = await http.post('/api/upload', fd, { 
-      headers: { 'Content-Type': 'multipart/form-data' }
+    const response = await http.post('/adopts/uploads', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
     })
     
     const urls = response.data?.urls || []
@@ -427,13 +467,31 @@ async function onSubmit(){
   }
 }
 
+watch(() => auth.value.loggedIn, (loggedIn) => {
+  if (loggedIn) {
+    prefillFromStore()
+    if (!prefilled.value) prefillFromApi()
+  }
+})
+
 // ===== 置頂按鈕 =====
 const showTop = ref(false)
 function toTop(){ window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
 onMounted(() => {
   loadAreas()
+  if (auth.value.loggedIn) {
+    prefillFromStore()
+    prefillFromApi()   // ❌ 不要用 if (!prefilled.value) 判斷了
+  }
   window.addEventListener('scroll', () => { showTop.value = window.scrollY > 200 })
+})
+
+watch(() => auth.value.loggedIn, (loggedIn) => {
+  if (loggedIn) {
+    prefillFromStore()
+    prefillFromApi()
+  }
 })
 </script>
 
@@ -544,6 +602,37 @@ onMounted(() => {
 /* 避免 select 箭頭區被裁切（少數瀏覽器） */
 .post-adopt-page .form-select {
   background-clip: padding-box;
+}
+
+/* 條款 checkbox 走品牌色 */
+.post-adopt-page .terms-check .form-check-input{
+  /* 主要：一行就把勾選顏色改掉（Chrome/Edge/Firefox/Safari 新版都支援） */
+  accent-color: var(--brand);
+
+  /* 小視覺微調（可留可拿掉） */
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  border: 2px solid var(--brand);
+  box-shadow: none;
+}
+
+/* 勾選狀態下，讓邊框/底色一致 */
+.post-adopt-page .terms-check .form-check-input:checked{
+  background-color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* focus 時走品牌陰影 */
+.post-adopt-page .terms-check .form-check-input:focus{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 .2rem rgba(209,159,114,.25);
+}
+
+/* 驗證沒勾選時，維持紅色提示樣式 */
+.post-adopt-page .terms-check .form-check-input.is-invalid{
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 .2rem rgba(220,53,69,.15) !important;
 }
 
 </style>
