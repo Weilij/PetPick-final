@@ -54,7 +54,7 @@
               <RouterLink class="btn btn-material position-relative" to="/cart" aria-label="購物車" title="購物車">
                 <span class="material-icons">shopping_cart</span>
                 <span v-if="cart.itemsCount > 0"
-                  class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill"
+                  class="badge bg-danger position-absolute top-0 start-80 translate-middle rounded-pill"
                   style="min-width:20px;">{{ cart.itemsCount }}</span>
               </RouterLink>
             </template>
