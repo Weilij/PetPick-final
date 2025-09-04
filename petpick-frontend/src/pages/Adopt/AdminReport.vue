@@ -1,18 +1,8 @@
 <template>
   <div class="container-fluid">
     <div class="row">
-      <!-- 側欄 -->
-      <nav class="col-md-2 d-none d-md-block bg-light sidebar">
-        <div class="position-sticky pt-3">
-          <ul class="nav flex-column">
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin/dashboard">首頁</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin/products">商品管理</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin/orders">訂單管理</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/admin/users">會員管理</RouterLink></li>
-            <li class="nav-item"><a class="nav-link active">回報管理</a></li>
-          </ul>
-        </div>
-      </nav>
+      <!-- 加回側欄 -->
+      <AdminSidebar active="report" />  <!-- 或依你的 Sidebar 寫法傳 'AdminReport' / 'Admin' -->
 
       <!-- 主體 -->
       <main class="col-md-10 ms-sm-auto px-md-4 mt-4">
@@ -114,6 +104,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { Modal } from 'bootstrap'
+import AdminSidebar from '@/components/AppSideBar.vue'
 
 // 👉 改成你專案的 axios 實例路徑（會自動帶 JWT、API_BASE）
 import http from '@/utils/http'  // ← 例如 src/utils/http.ts 的 default export
@@ -141,8 +132,9 @@ const detail = reactive({ imageUrl:'', petName:'', ownerName:'', reportDate:'', 
 const detailModal = ref(null)
 let modal
 
-// util
-const safeImg = (s) => s && /^(https?:\/\/|data:image\/|\/images\/|\/uploads\/|\/feedback\/)/i.test(s) ? s : ''
+// ✅ 接受 /adopt/feedback/ 與 /adopt/uploads/feedback/，沒圖時給預設圖
+const IMG_OK = /^(https?:\/\/|data:image\/|\/images\/|\/uploads\/|\/adopt\/feedback\/|\/adopt\/uploads\/feedback\/)/i
+const safeImg = (s) => (s && IMG_OK.test(s)) ? s : '/images/noimg.png'
 
 const allAdoptions = computed(() => [...need.value, ...done.value])
 const findAdoption = (id) => allAdoptions.value.find(a => String(a.id) === String(id)) || null

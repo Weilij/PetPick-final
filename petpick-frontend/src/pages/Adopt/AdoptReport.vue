@@ -205,10 +205,19 @@ function date10(v) {
   const s = String(v)
   return s.length >= 10 ? s.slice(0, 10) : s
 }
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+
 function safeImg(s) {
   if (!s) return '/images/noimg.png'
-  const ok = /^(https?:\/\/|data:image\/|\/images\/|\/uploads\/|\/feedback\/)/i.test(s)
-  return ok ? s : '/images/noimg.png'
+
+  // 已經是絕對網址或 data URL → 直接用
+  if (/^(https?:\/\/|data:image\/)/i.test(s)) return s
+
+  // 我們只幫 /adopt/feedback、/adopt/uploads、/uploads 這三種補完整網址
+  if (/^\/(adopt\/(feedback|uploads)\/|uploads\/)/i.test(s)) {
+    return API + s
+  }
+  return '/images/noimg.png'
 }
 function toDataURL(file) {
   return new Promise(resolve => {
