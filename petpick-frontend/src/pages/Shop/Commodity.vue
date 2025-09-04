@@ -518,7 +518,7 @@ function showToast(message, type = 'success') {
     z-index: 2000; 
     min-width: 300px;
     background-color: white;
-    border: solid 3px #d19f72;
+    border: solid 1.5px green;
     text-align: center;
     animation: slideIn 0.3s ease-out;
   `

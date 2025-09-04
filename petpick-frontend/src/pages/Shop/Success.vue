@@ -23,7 +23,7 @@
             <dt class="col-5 col-sm-3 text-sm-end fw-semibold">付款方式</dt>
             <dd class="col-7 col-sm-9"><span>{{ paymentType || '—' }}</span></dd>
 
-            <dt class="col-5 col-sm-3 text-sm-end fw-semibold">付款時間</dt>
+            <dt class="col-5 col-sm-3 text-sm-end fw-semibold">訂單建立時間</dt>
             <dd class="col-7 col-sm-9"><span>{{ payTime || '—' }}</span></dd>
 
             <dt class="col-5 col-sm-3 text-sm-end fw-semibold">金額</dt>
