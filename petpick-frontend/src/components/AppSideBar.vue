@@ -20,21 +20,21 @@
         <li class="nav-item">
           <a
             class="nav-link"
-            :class="{ active: active === 'Admin' }"
+            :class="{ active: active === 'posts' }"
             href="/post-review"
           >刊登審核管理</a>
         </li>
          <li class="nav-item">
           <a
             class="nav-link"
-            :class="{ active: active === 'Admin' }"
+            :class="{ active: active === 'apply' }"
             href="/apply-review"
           >認養申請管理</a>
         </li>
         <li class="nav-item">
           <a
             class="nav-link"
-            :class="{ active: active === 'Admin' }"
+            :class="{ active: active === 'report' }"
             href="/admin-report"
           >領養回報管理</a>
         </li>

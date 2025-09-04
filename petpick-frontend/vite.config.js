@@ -17,7 +17,9 @@ export default defineConfig({
         secure: false
       },
       '/uploads': { target: 'http://localhost:8080', changeOrigin: true },
-      '/ws': { target: 'http://localhost:8080', changeOrigin: true, ws: true }
+      '/ws': { target: 'http://localhost:8080', changeOrigin: true, ws: true },
+      '/adopt/feedback': { target: 'http://localhost:8080', changeOrigin: true },
+      '/adopt/uploads': { target: 'http://localhost:8080', changeOrigin: true }
     }
   }
 })
