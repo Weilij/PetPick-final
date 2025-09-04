@@ -56,7 +56,7 @@
                   <h5 class="fw-bold mb-1">{{ r.petName || '' }}</h5>
                   <p class="mb-1"><small>飼主：{{ r.ownerName || '' }}</small></p>
                   <p class="mb-1"><small>日期：{{ (r.reportDate||'').slice(0,10) || '—' }}</small></p>
-                  <p class="mb-1"><small>狀況：{{ r.status || '' }}</small></p>
+                  <p class="mb-1"><small>適應狀況：{{ r.adaptStatus || '—' }}</small></p>
                   <p class="mb-2"><small>描述：{{ r.notes || '' }}</small></p>
                   <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-outline-primary" @click="openDetail(r)">詳情</button>
@@ -88,7 +88,7 @@
                   <li class="list-group-item"><strong>寵物名稱：</strong><span>{{ detail.petName }}</span></li>
                   <li class="list-group-item"><strong>飼主姓名：</strong><span>{{ detail.ownerName }}</span></li>
                   <li class="list-group-item"><strong>回報日期：</strong><span>{{ detail.reportDate?.slice(0,10) }}</span></li>
-                  <li class="list-group-item"><strong>適應狀況：</strong><span>{{ detail.status }}</span></li>
+                  <li class="list-group-item"><strong>適應狀況：</strong><span>{{ detail.adaptStatus || '—' }}</span></li>
                   <li class="list-group-item"><strong>近況描述：</strong><span>{{ detail.notes }}</span></li>
                 </ul>
               </div>
@@ -109,6 +109,26 @@ import AdminSidebar from '@/components/AppSideBar.vue'
 // 👉 改成你專案的 axios 實例路徑（會自動帶 JWT、API_BASE）
 import http from '@/utils/http'  // ← 例如 src/utils/http.ts 的 default export
 
+// ====== 這段就放在這裡（頂層、一次定義全檔可用）======
+const NOTES_ADAPT = /^\s*[【\[]([^】\]]{1,6})[】\]]\s*(.*)$/;
+function splitNotes(notes) {
+  const s = (notes || '').trim();
+  const m = s.match(NOTES_ADAPT);
+  return m ? { adapt: m[1].trim(), pure: (m[2] || '').trim() } : { adapt: '', pure: s };
+}
+
+// 新增一個小工具：把一筆回報加工出 adaptStatus + 乾淨 notes
+function decorateRow(r, adoption) {
+  const { adapt, pure } = splitNotes(r.notes);
+  return {
+    ...r,
+    ownerName: adoption?.ownerName,
+    petName:  adoption?.petName,
+    adaptStatus: adapt,
+    notes: pure,
+  };
+}
+
 // API
 const api = {
   listNeed: () => http.get('/api/petreport/adoptions/need').then(r => r.data),
@@ -128,7 +148,7 @@ const reports = ref([])        // 目前選取會員的回報
 const search = ref('')         // 搜尋字
 const searchingRows = ref([])  // 搜尋結果
 
-const detail = reactive({ imageUrl:'', petName:'', ownerName:'', reportDate:'', status:'', notes:'' })
+const detail = reactive({ imageUrl:'', petName:'', ownerName:'', reportDate:'', status:'', adaptStatus:'', notes:'' })
 const detailModal = ref(null)
 let modal
 
@@ -163,11 +183,10 @@ async function reloadSelects(){
 
 async function loadAdoption(adoptionId){
   if (!adoptionId){ reports.value = []; return }
-  const rows = await api.listReports(adoptionId)
-  rows.sort((b,a) => new Date(a.reportDate) - new Date(b.reportDate))
-  const a = findAdoption(adoptionId) || {}
-  // 補足 ownerName / petName 供右側卡片與 Modal 用
-  reports.value = rows.map(r => ({ ...r, ownerName: a.ownerName, petName: a.petName }))
+  const rows = await api.listReports(adoptionId);
+  rows.sort((b,a) => new Date(a.reportDate) - new Date(b.reportDate));
+  const a = findAdoption(adoptionId) || {};
+  reports.value = rows.map(r => decorateRow(r, a));
 }
 
 function onChooseNeed(){
@@ -183,23 +202,19 @@ function onChooseDone(){
 
 let timer = null
 watch(search, (val) => {
-  clearTimeout(timer)
+  clearTimeout(timer);
   timer = setTimeout(async () => {
-    const q = (val || '').trim()
+    const q = (val || '').trim();
     if (q.length < 2){
-      await loadAdoption(selNeed.value || selDone.value || '')
-      searchingRows.value = []
-      return
+      await loadAdoption(selNeed.value || selDone.value || '');
+      searchingRows.value = [];
+      return;
     }
-    const rows = await api.search(q)
-    rows.sort((b,a)=> new Date(a.reportDate) - new Date(b.reportDate))
-    // 從 need/done 快取補 ownerName/petName
-    searchingRows.value = rows.map(r => {
-      const a = findAdoption(r.adoptionId) || {}
-      return { ...r, ownerName: a.ownerName, petName: a.petName }
-    })
-  }, 250)
-})
+    const rows = await api.search(q);
+    rows.sort((b,a)=> new Date(a.reportDate) - new Date(b.reportDate));
+    searchingRows.value = rows.map(r => decorateRow(r, findAdoption(r.adoptionId) || {}));
+  }, 250);
+});
 
 async function onDelete(id){
   if (!confirm('確定要刪除此回報嗎？')) return
@@ -208,10 +223,7 @@ async function onDelete(id){
   if (q.length >= 2){
     const rows = await api.search(q)
     rows.sort((b,a)=> new Date(a.reportDate) - new Date(b.reportDate))
-    searchingRows.value = rows.map(r => {
-      const a = findAdoption(r.adoptionId) || {}
-      return { ...r, ownerName: a.ownerName, petName: a.petName }
-    })
+  searchingRows.value = rows.map(r => decorateRow(r, findAdoption(r.adoptionId) || {}));
   }else{
     await loadAdoption(selNeed.value || selDone.value || '')
   }
@@ -219,15 +231,16 @@ async function onDelete(id){
 
 function openDetail(r){
   Object.assign(detail, {
-    imageUrl: safeImg(r.imageUrl),
-    petName: r.petName || '',
-    ownerName: r.ownerName || '',
+    imageUrl:   safeImg(r.imageUrl),
+    petName:    r.petName || '',
+    ownerName:  r.ownerName || '',
     reportDate: r.reportDate || '',
-    status: r.status || '',
-    notes: r.notes || ''
-  })
-  if (!modal) modal = new Modal(detailModal.value)
-  modal.show()
+    status:     r.status || '',            // 審核狀態（SUBMITTED/VERIFIED/REJECTED）
+    adaptStatus:r.adaptStatus || '',       // ← 直接用前面算好的
+    notes:      r.notes || ''              // ← 已是去掉【】後的描述
+  });
+  if (!modal) modal = new Modal(detailModal.value);
+  modal.show();
 }
 
 onMounted(async () => {
