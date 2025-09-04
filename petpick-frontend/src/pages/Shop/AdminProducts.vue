@@ -210,7 +210,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import * as bootstrap from 'bootstrap'
-import AdminSidebar from '@/components/AppSidebar.vue' // 直接導入剛才的 sidebar
+import AdminSidebar from '@/components/AppSideBar.vue'//修正匯入路徑
+import http from '@/utils/http'   // ✅ 匯入 http
+
 
 // ====== Config ======
 const API_BASE = '/api/products'
@@ -313,21 +315,18 @@ onMounted(async () => {
 
 // ====== API ======
 async function loadProducts() {
-    showLoading(true)
-    try {
-        const res = await fetch(API_BASE)
-        if (!res.ok) throw new Error(`讀取失敗（${res.status}）`)
-        allProducts.value = (await res.json()) || []
-        // 回到第一頁
-        page.value = 1
-    } catch (err) {
-        allProducts.value = []
-        toast(err.message || '載入失敗', 'danger')
-    } finally {
-        showLoading(false)
-    }
+  showLoading(true)
+  try {
+    const res = await http.get(API_BASE)   // ✅ fetch → http.get
+    allProducts.value = res.data || []
+    page.value = 1
+  } catch (err) {
+    allProducts.value = []
+    toast(err.message || '載入失敗', 'danger')
+  } finally {
+    showLoading(false)
+  }
 }
-
 // ====== UI Actions ======
 function gotoPage(p) {
     if (!Number.isFinite(p)) return
@@ -388,8 +387,11 @@ async function onSubmit() {
 
     showLoading(true)
     try {
-        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        if (!res.ok) throw new Error(`儲存失敗（${res.status}）`)
+    if (id) {
+      await http.put(`${API_BASE}/${id}`, payload)   // ✅ 用 PUT
+    } else {
+      await http.post(API_BASE, payload)             // ✅ 用 POST
+    }
         await loadProducts()
         formModal.hide()
         toast(id ? '更新成功' : '新增成功', 'success')
@@ -407,27 +409,28 @@ function onDeleteAsk(p) {
     delModal.show()
 }
 async function onDeleteDo() {
-    if (!delId.value) return
-    showLoading(true)
-    try {
-        const res = await fetch(`${API_BASE}/${delId.value}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error(`刪除失敗（${res.status}）`)
-        // 從快取移除
-        allProducts.value = allProducts.value.filter(x => pickId(x) !== delId.value)
-        // 可能需要往前翻頁
-        const maxStart = Math.max(0, allProducts.value.length - 1)
-        const start = (page.value - 1) * size.value
-        if (start >= maxStart) page.value = Math.max(1, page.value - 1)
-        toast('刪除成功', 'success')
-    } catch (err) {
-        toast(err.message || '刪除失敗', 'danger')
-    } finally {
-        showLoading(false)
-        delModal.hide()
-        delId.value = null
-        delName.value = ''
-    }
+  if (!delId.value) return
+  showLoading(true)
+  try {
+    await http.delete(`${API_BASE}/${delId.value}`)   // axios 自動丟錯就好
+
+    // 從快取移除
+    allProducts.value = allProducts.value.filter(x => pickId(x) !== delId.value)
+    // 可能需要往前翻頁
+    const maxStart = Math.max(0, allProducts.value.length - 1)
+    const start = (page.value - 1) * size.value
+    if (start >= maxStart) page.value = Math.max(1, page.value - 1)
+    toast('刪除成功', 'success')
+  } catch (err) {
+    toast(err.message || '刪除失敗', 'danger')
+  } finally {
+    showLoading(false)
+    delModal.hide()
+    delId.value = null
+    delName.value = ''
+  }
 }
+
 
 // 上/下架切換
 async function onToggleActive(p) {
@@ -438,26 +441,20 @@ async function onToggleActive(p) {
         // 1) 嘗試 PATCH /{id}/active?active=true|false
         let ok = false
         try {
-            const r = await fetch(`${API_BASE}/${id}/active?active=${nextActive}`, { method: 'PATCH' })
-            ok = r.ok
+      await http.patch(`${API_BASE}/${id}/active`, null, { params: { active: nextActive } })  // ✅ PATCH
+            ok = true
         } catch { }
 
         // 2) 回退：GET → PUT
         if (!ok) {
-            const res = await fetch(`${API_BASE}/${id}`)
-            if (!res.ok) throw new Error(`讀取商品失敗（${res.status}）`)
-            const one = await res.json()
-            one.active = nextActive
-            one.isActive = nextActive
-            one.name = one.name ?? one.pname ?? ''
-            one.pname = one.name
-            const res2 = await fetch(`${API_BASE}/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(one)
-            })
-            if (!res2.ok) throw new Error(`更新失敗（${res2.status}）`)
-        }
+      const oneRes = await http.get(`${API_BASE}/${id}`)
+      const one = oneRes.data
+      one.active = nextActive
+      one.isActive = nextActive
+      one.name = one.name ?? one.pname ?? ''
+      one.pname = one.name
+      await http.put(`${API_BASE}/${id}`, one)   // ✅ PUT
+    }
 
         // 更新前端
         allProducts.value = allProducts.value.map(x =>

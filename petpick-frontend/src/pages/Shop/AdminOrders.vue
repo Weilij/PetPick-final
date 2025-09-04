@@ -316,7 +316,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import * as bootstrap from 'bootstrap'
-import AdminSidebar from '@/components/AppSidebar.vue' // ⬅ 修正匯入路徑
+import AdminSidebar from '@/components/AppSideBar.vue'//修正匯入路徑
+import http from '@/utils/http' //設定http
+
 
 // ===== Config =====
 const API_BASE = '/api/admin/orders'
@@ -376,47 +378,57 @@ const pageWindowList = computed(() => {
 })
 
 // ===== API =====
-async function fetchOrders() {
-    const p = new URLSearchParams()
-    if (filters.q) p.set('q', filters.q)
-    if (filters.status) p.set('status', filters.status)
-    if (filters.delivery) p.set('delivery', filters.delivery)
-    if (filters.dateFrom) p.set('dateFrom', filters.dateFrom)
-    if (filters.dateTo) p.set('dateTo', filters.dateTo)
-    p.set('page', String(page.value)); p.set('size', String(size.value))
+async function fetchOrders(p = 1, s = 10) {
+  try {
+    const { data } = await http.get(API_BASE, {
+      headers: ADMIN_HEADERS,
+      params: { page: p - 1, size: s } // 注意有些後端 page 從 0 開始
+    })
 
-    const res = await fetch(`${API_BASE}?${p.toString()}`, { headers: { ...ADMIN_HEADERS } })
-    if (!res.ok) throw new Error(`讀取失敗 (${res.status})`)
-    const data = await res.json()
-    if (Array.isArray(data)) { totalElements.value = data.length; totalPages.value = 1; return data }
-    totalElements.value = Number(data.totalElements ?? 0)
-    totalPages.value = Number(data.totalPages ?? 1)
-    return Array.isArray(data.content) ? data.content : []
+    // 如果後端回傳有 content，就取 content
+    if (Array.isArray(data.content)) {
+      totalPages.value = data.totalPages || 1
+      totalElements.value = data.totalElements || data.total || 0
+      size.value = data.size || s
+      page.value = (data.number || 0) + 1
+      return data.content
+    }
+
+    // 如果直接就是陣列
+    if (Array.isArray(data)) {
+      totalPages.value = 1
+      totalElements.value = data.length
+      return data
+    }
+
+    return []
+  } catch (err) {
+    console.error('讀取訂單列表失敗:', err)
+    throw new Error('讀取訂單列表失敗')
+  }
 }
-async function apiPatch(url, body) {
-    const r = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS }, body: JSON.stringify(body || {}) })
-    if (!r.ok) throw new Error(await safeText(r)); return true
-}
-async function apiPost(url, body) {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS }, body: JSON.stringify(body || {}) })
-    if (!r.ok) throw new Error(await safeText(r)); return true
-}
+
+
 async function apiGet(url) {
-    const r = await fetch(url, { headers: { ...ADMIN_HEADERS } }); const j = await r.json().catch(() => ({}))
-    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`); return j
+  const { data } = await http.get(url, { headers: ADMIN_HEADERS })
+  if (data.ok === false) throw new Error(data.error || '查詢失敗')
+  return data
 }
 
 // ===== Load / Paging =====
 async function loadPage(p = 1) {
-    page.value = Math.max(1, p); showLoading(true)
-    try {
-        orders.value = await fetchOrders()
-        lastRefreshed.value = new Date().toISOString()
-        selected.clear()
-        await nextTick()
-        hydrateDelivery(); hydrateStatus()
-    } catch (err) { toast(`載入失敗：${escapeHtml(err.message || '')}`, 'danger'); orders.value = [] }
-    finally { showLoading(false) }
+  page.value = Math.max(1, p)
+  showLoading(true)
+  try {
+    orders.value = await fetchOrders()
+    lastRefreshed.value = new Date().toISOString()
+    selected.clear()
+  } catch (err) {
+    toast(`載入失敗：${escapeHtml(err.message || '')}`, 'danger')
+    orders.value = []
+  } finally {
+    showLoading(false)
+  }
 }
 function gotoPage(p) { if (Number.isFinite(p) && p >= 1 && p <= totalPages.value) loadPage(p) }
 function onSearch() { loadPage(1) }
@@ -429,7 +441,7 @@ function selectedIds() { return Array.from(selected.values()) }
 function openBulkMarkPaid() { if (!hasSelection.value) return; Object.assign(markPaidForm, { ids: selectedIds(), orderId: null, gateway: 'Manual', tradeNo: '', paidAmount: 0 }); markPaidModal.show() }
 async function bulkUpdateStatus(targetStatus) {
     const ids = selectedIds(); if (!ids.length) return
-    try { showLoading(true); await apiPost(`${API_BASE}/bulk-status`, { orderIds: ids, status: targetStatus, note: '' }); toast(`已批次標記為 ${targetStatus}`); await loadPage(page.value) }
+    try { showLoading(true); await http.post(`${API_BASE}/bulk-status`, { orderIds: ids, status: targetStatus, note: '' }); toast(`已批次標記為 ${targetStatus}`); await loadPage(page.value) }
     catch (err) { toast(`批次操作失敗：${escapeHtml(err.message || '')}`, 'danger') }
     finally { showLoading(false) }
 }
@@ -441,7 +453,7 @@ function onOpenStatus(id, currStatus = 'Pending') { Object.assign(statusForm, { 
 function hideStatusModal() { statusModal.hide() }
 async function onSaveStatus() {
     const id = statusForm.orderId; if (!id) return
-    try { showLoading(true); await apiPatch(`${API_BASE}/${id}/status`, { status: statusForm.status, note: statusForm.note || '' }); statusModal.hide(); toast('狀態已更新'); await loadPage(page.value) }
+    try { showLoading(true); await http.patch(`${API_BASE}/${id}/status`, { status: statusForm.status, note: statusForm.note || '' }); statusModal.hide(); toast('狀態已更新'); await loadPage(page.value) }
     catch (err) { toast(`更新失敗：${escapeHtml(err.message || '')}`, 'danger') }
     finally { showLoading(false) }
 }
@@ -452,9 +464,14 @@ async function onMarkPaid() {
     try {
         showLoading(true)
         if (markPaidForm.ids.length > 0) {
-            await apiPost(`${API_BASE}/bulk-status`, { orderIds: markPaidForm.ids, status: 'Paid', note: `手動：${markPaidForm.gateway || 'Manual'} / ${markPaidForm.tradeNo || ''} / ${markPaidForm.paidAmount || ''}` })
+            await http.post(`${API_BASE}/bulk-mark-paid`, {
+                orderIds: markPaidForm.ids,
+                gateway: markPaidForm.gateway || 'Manual',
+                tradeNo: markPaidForm.tradeNo || '',
+                paidAmount: Number(markPaidForm.paidAmount || 0)
+            })
         } else if (markPaidForm.orderId) {
-            await apiPost(`${API_BASE}/${markPaidForm.orderId}/mark-paid`, { gateway: markPaidForm.gateway || 'Manual', tradeNo: markPaidForm.tradeNo || '', paidAmount: Number(markPaidForm.paidAmount || 0) })
+            await http.post(`${API_BASE}/${markPaidForm.orderId}/mark-paid`, { gateway: markPaidForm.gateway || 'Manual', tradeNo: markPaidForm.tradeNo || '', paidAmount: Number(markPaidForm.paidAmount || 0) })
         }
         markPaidModal.hide(); toast('已標記為已付款'); await loadPage(page.value)
     } catch (err) { toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger') }
@@ -466,8 +483,22 @@ function hideCancelModal() { cancelModal.hide() }
 async function onSaveCancel() {
     try {
         showLoading(true)
-        if (cancelForm.ids.length > 0) { await apiPost(`${API_BASE}/bulk-status`, { orderIds: cancelForm.ids, status: 'Cancelled', note: cancelForm.reason || '' }); cancelModal.hide(); toast('已批次取消') }
-        else if (cancelForm.orderId) { await apiPost(`${API_BASE}/${cancelForm.orderId}/cancel`, { reason: cancelForm.reason || '' }); cancelModal.hide(); toast('訂單已取消') }
+if (cancelForm.ids.length > 0) {
+  await http.post(`${API_BASE}/bulk-status`, {
+    orderIds: cancelForm.ids,
+    status: 'Cancelled',
+    note: cancelForm.reason || ''
+  })
+  cancelModal.hide()
+  toast('已批次取消')
+} 
+else if (cancelForm.orderId) {
+  await http.post(`${API_BASE}/${cancelForm.orderId}/cancel`, {
+    reason: cancelForm.reason || ''
+  })
+  cancelModal.hide()
+  toast('訂單已取消')
+}
         await loadPage(page.value)
     } catch (err) { toast(`取消失敗：${escapeHtml(err.message || '')}`, 'danger') }
     finally { showLoading(false) }
@@ -521,33 +552,57 @@ function hideLogisticsModal() { logisticsModal.hide() }
 
 async function onSaveLogistics() {
     const id = logisticsForm.orderId; if (!id) return
-    try {
-        showLoading(true)
-        const payload = {}; const lid = (logisticsForm.logisticsId || '').trim(); const tno = (logisticsForm.trackingNo || '').trim()
-        if (lid) payload.logisticsId = lid; if (tno) payload.trackingNo = tno
-        if (!Object.keys(payload).length) { toast('沒有可更新的欄位', 'warning'); return }
-        await apiPost(`${API_BASE}/${id}/logistics`, payload); logisticsModal.hide(); toast('物流資訊已儲存'); await loadPage(page.value)
-    } catch (err) { toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+   try {
+  showLoading(true)
+  const payload = {}
+  const lid = (logisticsForm.logisticsId || '').trim()
+  const tno = (logisticsForm.trackingNo || '').trim()
+  if (lid) payload.logisticsId = lid
+  if (tno) payload.trackingNo = tno
+
+  if (!Object.keys(payload).length) {
+    toast('沒有可更新的欄位', 'warning')
+    return
+  }
+
+  await http.post(`${API_BASE}/${id}/logistics`, payload)
+  logisticsModal.hide()
+  toast('物流資訊已儲存')
+  await loadPage(page.value)
+} catch (err) {
+  toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger')
+} finally {
+  showLoading(false)
+}
 }
 
 // Logistics APIs
-async function queryTrackingFromEcpay(orderId) { return apiGet(`/api/logistics/home/query/${encodeURIComponent(orderId)}`) }
-async function queryCvsFromEcpay(orderId) { return apiGet(`/api/logistics/cvs/query/${encodeURIComponent(orderId)}`) }
+async function queryTrackingFromEcpay(orderId) {
+  const { data } = await http.get(`/api/logistics/home/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
+  return data
+}
+async function queryCvsFromEcpay(orderId) {
+  const { data } = await http.get(`/api/logistics/cvs/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
+  return data
+}
 
 async function createHomeFor(orderId) {
     if (!orderId) return
     try {
         showLoading(true)
         const base = await fetchOrderOne(orderId); const isCod = resolvePayMethod(base) === 'COD'
-        const r = await fetch('/api/logistics/home/ecpay/create', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS }, body: JSON.stringify({ orderId, isCollection: isCod }) })
-        const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) throw new Error(j.error || '建立失敗')
-        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
+const { data: j } = await http.post(
+  '/api/logistics/home/ecpay/create',
+  { orderId, isCod }, // body
+  { headers: ADMIN_HEADERS }
+)
+if (j.ok === false) throw new Error(j.error || '建立失敗')       
+if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
         const payload = {}; if (j.logisticsId) payload.logisticsId = j.logisticsId; if (j.trackingNo) payload.trackingNo = j.trackingNo
-        if (Object.keys(payload).length) await apiPost(`${API_BASE}/${orderId}/logistics`, payload)
+        if (Object.keys(payload).length) await http.post(`${API_BASE}/${orderId}/logistics`, payload)
         if (j.trackingNo) { toast(`宅配託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`); } else { toast('宅配託運單建立完成，追蹤碼尚未提供（將於回拋或查詢後自動更新）', 'warning'); await pollTracking(orderId, 6, 5000); }
         try { await hydrateStatus() } catch { }
-        await apiPatch(`${API_BASE}/${orderId}/status`, { status: 'Shipped', note: 'Admin 建立綠界宅配' })
+        await http.patch(`${API_BASE}/${orderId}/status`, { status: 'Shipped', note: 'Admin 建立綠界宅配' })
         orderCache.delete(Number(orderId)); await loadPage(page.value)
     } catch (err) { toast(`宅配建立失敗：${escapeHtml(err.message || '')}`, 'danger') }
     finally { showLoading(false) }
@@ -557,12 +612,17 @@ async function createCvsForB2C(orderId) {
     if (!orderId) return
     try {
         showLoading(true)
-        const r = await fetch('/api/logistics/cvs/ecpay/create-b2c', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS }, body: JSON.stringify({ orderId, subType: 'FAMI', isCollection: true }) })
-        const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) throw new Error(j.error || '建立失敗')
+       const { data: j } = await http.post(
+  '/api/logistics/cvs/ecpay/create-b2c',
+  { orderId, subType: 'FAMI', isCollection: true },
+  { headers: ADMIN_HEADERS }
+)
+if (j.ok === false) throw new Error(j.error || '建立失敗')
+
         if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
         const payload = {}; if (j.logisticsId) payload.logisticsId = j.logisticsId; if (j.trackingNo) payload.trackingNo = j.trackingNo
         if (j.cvsPaymentNo) payload.cvsPaymentNo = j.cvsPaymentNo; if (j.cvsValidationNo) payload.cvsValidationNo = j.cvsValidationNo
-        if (Object.keys(payload).length) await apiPost(`${API_BASE}/${orderId}/logistics`, payload)
+        if (Object.keys(payload).length) await http.post(`${API_BASE}/${orderId}/logistics`, payload)
         if (j.trackingNo) {
             toast(`超商託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`);
         } else if (j.logisticsId) {
@@ -571,7 +631,7 @@ async function createCvsForB2C(orderId) {
             toast('超商託運單建立完成（追蹤碼將於回拋或查詢後更新）', 'warning');
         }
         try { await hydrateStatus() } catch { }
-        await apiPatch(`${API_BASE}/${orderId}/status`, { status: 'Shipped', note: 'Admin 建立綠界超商B2C（全家）' })
+        await http.patch(`${API_BASE}/${orderId}/status`, { status: 'Shipped', note: 'Admin 建立綠界超商B2C（全家）' })
         orderCache.delete(Number(orderId)); await loadPage(page.value)
     } catch (err) { toast(`超商託運單建立失敗：${escapeHtml(err.message || '')}`, 'danger') }
     finally { showLoading(false) }
@@ -600,9 +660,17 @@ async function hydrateStatus() {
 async function hydrateDelivery() { for (const row of orders.value) { try { Object.assign(row, await fetchOrderOne(row.orderId)) } catch { } } }
 
 async function fetchOrderOne(id) {
-    id = Number(id); if (orderCache.has(id)) return orderCache.get(id)
-    const r = await fetch(`${API_BASE}/${id}`, { headers: { ...ADMIN_HEADERS } }); if (!r.ok) throw new Error(`讀取訂單失敗 (${r.status})`)
-    const data = await r.json(); orderCache.set(id, data); return data
+  id = Number(id)
+  if (orderCache.has(id)) return orderCache.get(id)
+
+  try {
+    const { data } = await http.get(`${API_BASE}/${id}`, { headers: ADMIN_HEADERS })
+    orderCache.set(id, data)
+    return data
+  } catch (err) {
+    console.error('讀取單筆訂單失敗:', err)
+    throw new Error('讀取單筆訂單失敗')
+  }
 }
 
 // ===== Export CSV =====
@@ -632,8 +700,10 @@ function collectRows() {
 }
 
 // ===== Utils =====
-function showLoading(v) { loading.value = !!v }
-function toast(message, type = 'success') {
+function showLoading(isLoading) {
+  // TODO: 放 loading 動畫控制
+  console.log(isLoading ? '載入中...' : '載入完成')
+}function toast(message, type = 'success') {
     const id = 't' + Math.random().toString(36).slice(2)
     const html = `<div id="${id}" class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="d-flex"><div class="toast-body">${message}</div>
