@@ -52,7 +52,6 @@ const router = createRouter({
 
     // Chat（需要登入）
     { path: '/chat', name: 'chat', component: Chat, meta: { requiresAuth: true } },
-    { path: '/test', name: 'wsTest', component: () => import('@/pages/Chat/WsTest.vue') },
 
     // Mission
     { path: '/missions', name: 'missions', component: MissionMain },
