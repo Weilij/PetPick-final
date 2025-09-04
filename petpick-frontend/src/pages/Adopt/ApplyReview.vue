@@ -2,7 +2,7 @@
   <div class="container-fluid">
     <div class="row">
       <!-- 側邊欄 -->
-      <AdminSidebar active="Admin" />
+      <AdminSidebar active="apply" />
 
 
       <!-- 主內容 -->
