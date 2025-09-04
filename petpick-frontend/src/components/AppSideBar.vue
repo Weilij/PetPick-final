@@ -4,6 +4,13 @@
     <div class="position-sticky pt-3">
       <ul class="nav flex-column">
         <li class="nav-item">
+          <a
+            class="nav-link"
+            :class="{ active: active === 'member' }"
+            href="adminview"
+          >會員管理</a>
+        </li>
+        <li class="nav-item">
           <RouterLink
             class="nav-link"
             :class="{ active: currentKey === 'products' }"
