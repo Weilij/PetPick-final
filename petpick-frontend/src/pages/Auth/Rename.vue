@@ -131,7 +131,7 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
-import axios from '@/utils/http'
+import http from '@/utils/http'
 import { useUserStore } from '@/stores/user'
 
 const user = useUserStore()
@@ -167,10 +167,12 @@ const personalityOptions = [
   { val:'p3', text:'接受怕生的' }
 ]
 
-// 載入個人資料（依你的後端調整 API）
+// 載入個人資料
 async function loadProfile(){
   try{
-    const { data } = await axios.get(`/api/users/${uid}`)
+const response = await http.get('/api/auth/me')
+    const data = response.data
+    
     Object.assign(form, {
       username: data.username ?? '',
       gender: data.gender ?? '',
@@ -179,41 +181,101 @@ async function loadProfile(){
       district: data.district ?? '',
       experience: data.experience ?? '有',
       daily: data.daily ?? '正常作息（7:00-9:00起床）',
-      petList: Array.isArray(data.petList)? data.petList : [],
-      petActivitiesList: Array.isArray(data.petActivitiesList)? data.petActivitiesList : []
+      petList: Array.isArray(data.petList) ? data.petList : [],
+      petActivitiesList: Array.isArray(data.petActivitiesList) ? data.petActivitiesList : []
     })
-  }catch(e){ msg.error='載入個人資料失敗'; }
+    
+    console.log('✅ 個人資料載入成功:', data)
+  } catch(e) { 
+    console.error('❌ 載入個人資料失敗:', e)
+    msg.error = '載入個人資料失敗'
+  }
 }
-function resetProfile(){ loadProfile(); }
+
+function resetProfile(){ 
+  loadProfile()
+}
 
 async function onSaveProfile(){
-  msg.success=''; msg.error=''; saving.value=true
+  msg.success = ''
+  msg.error = ''
+  saving.value = true
+  
   try{
-    await axios.patch(`/api/users/${uid}`, form) // ← 如需表單格式自行調整
-    msg.success='已更新個人資料'
-  }catch(e){ msg.error = (e?.response?.data?.message) || '更新失敗' }
-  finally{ saving.value=false }
+    const response = await http.put(`/api/users/${uid}`, form)
+    
+    console.log('✅ 個人資料更新成功:', response.data)
+    msg.success = '已更新個人資料'
+    
+  } catch(e) { 
+    console.error('❌ 更新個人資料失敗:', e)
+    msg.error = e?.response?.data?.message || '更新失敗'
+  } finally { 
+    saving.value = false 
+  }
 }
 
 async function onChangePassword(){
-  if (pwd.newPassword !== pwd.confirmPassword){ msg.error='兩次新密碼不一致'; return; }
-  msg.success=''; msg.error=''; saving.value=true
+  if (pwd.newPassword !== pwd.confirmPassword) { 
+    msg.error = '兩次新密碼不一致'
+    return
+  }
+  
+  msg.success = ''
+  msg.error = ''
+  saving.value = true
+  
   try{
-    await axios.post(`/api/users/${uid}/password`, pwd)
-    msg.success='已更新密碼'; Object.assign(pwd,{currentPassword:'',newPassword:'',confirmPassword:''})
-  }catch(e){ msg.error = (e?.response?.data?.message) || '密碼更新失敗' }
-  finally{ saving.value=false }
+    const response = await http.put(`/api/users/${uid}/password`, {
+      password: pwd.newPassword,
+      currentPassword: pwd.currentPassword
+    })
+    
+    console.log('✅ 密碼更新成功:', response.data)
+    msg.success = '已更新密碼'
+    
+    // 清空密碼欄位
+    Object.assign(pwd, {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    })
+    
+  } catch(e) { 
+    console.error('❌ 密碼更新失敗:', e)
+    msg.error = e?.response?.data?.message || '密碼更新失敗'
+  } finally { 
+    saving.value = false 
+  }
 }
 
 async function onDeleteAccount(){
   if (!confirm('確認刪除帳號？此操作不可復原')) return
-  msg.success=''; msg.error=''; saving.value=true
+  
+  msg.success = ''
+  msg.error = ''
+  saving.value = true
+  
   try{
-    await axios.delete(`/api/users/${uid}`)
-    msg.success='帳號已刪除'
-    // 這裡可導回首頁或登出
-  }catch(e){ msg.error = (e?.response?.data?.message) || '刪除失敗' }
-  finally{ saving.value=false }
+    const response = await http.delete(`/api/users/${uid}`, {
+      params: { reason: '用戶主動刪除帳號' }
+    })
+    
+    console.log('✅ 帳號刪除成功:', response.data)
+    msg.success = '帳號已刪除'
+    
+    // 登出並導回首頁
+    setTimeout(() => {
+      user.logout()
+      window.location.href = '/'
+    }, 2000)
+    
+  } catch(e) { 
+    console.error('❌ 刪除帳號失敗:', e)
+    msg.error = e?.response?.data?.message || '刪除失敗'
+  } finally { 
+    saving.value = false 
+  }
 }
 
 onMounted(loadProfile)

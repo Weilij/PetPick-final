@@ -6,6 +6,13 @@
         <li class="nav-item">
           <a
             class="nav-link"
+            :class="{ active: active === 'member' }"
+            href="adminview"
+          >會員管理</a>
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
             :class="{ active: active === 'products' }"
             href="adminProducts"
           >商品管理</a>
