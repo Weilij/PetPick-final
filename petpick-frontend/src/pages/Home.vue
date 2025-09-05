@@ -4,11 +4,11 @@
             <div class="d-flex align-items-center h-100">
                 <div class="text-black" style="margin-left: 50%;">
                     <h1 class="fw-bold mb-3">寵物方面的大小事<br>讓我們為您解決吧！</h1>
-                    <button class="btn"><a class="btn btn-login" href="#">尋找領養</a></button>
+                    <button class="btn"><a class="btn btn-login" href="/adopt/list">尋找領養</a></button>
                     <button class="btn">
                         <router-link class="nav-link btn btn-login m-1" to="/missions">尋找任務</router-link>
                     </button>
-                    <button class="btn"><a class="btn btn-login" href="#">寵物商城</a></button>
+                    <button class="btn"><a class="btn btn-login" href="/commodity">寵物商城</a></button>
                 </div>
             </div>
         </div>
