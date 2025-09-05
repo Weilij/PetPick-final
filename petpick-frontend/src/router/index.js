@@ -21,6 +21,8 @@ const Register = () => import('../pages/Auth/Register.vue')
 const Rename = () => import('../pages/Auth/Rename.vue')
 const ResetPassword = () => import('../pages/Auth/ResetPassword.vue')
 const RegisterSuccess = () => import('../pages/Auth/RegisterSuccess.vue')
+const AdminView = () => import('../pages/Auth/AdminView.vue')
+
 
 //Shop
 const Commodity = () => import('../pages/Shop/Commodity.vue')
@@ -69,6 +71,8 @@ const router = createRouter({
     { path: '/rename', name: 'rename', component: Rename, meta: { requiresAuth: true } },
     { path: '/reset-password', name: 'resetPassword', component: ResetPassword },
     { path: '/register-success', name: 'registerSuccess', component: RegisterSuccess },
+    { path: '/adminview', name: 'adminView', component: AdminView },
+
 
     //Shop
     { path: '/commodity', name: 'commodity', component: Commodity },

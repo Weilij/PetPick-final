@@ -2,7 +2,7 @@
   <div class="container-fluid post-review-page">
     <div class="row">
     <!-- 側邊選單 -->
-    <AdminSidebar active="Admin" />
+    <AdminSidebar active="posts" />
 
       <!-- 主內容 -->
       <main class="col-md-10 ms-sm-auto px-md-4 py-4">

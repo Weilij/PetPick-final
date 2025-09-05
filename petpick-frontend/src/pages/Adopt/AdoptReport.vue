@@ -69,17 +69,17 @@
                 </div>
 
                 <div class="mb-3">
-                  <label class="form-label">適應狀況（僅顯示用）</label><br />
+                  <label class="form-label">適應狀況</label><br />
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="status" value="SUBMITTED" v-model="form.status" />
+                    <input class="form-check-input" type="radio" name="adapt" value="良好" v-model="form.adapt" />
                     <label class="form-check-label">良好</label>
                   </div>
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="status" value="SUBMITTED" v-model="form.status" />
+                    <input class="form-check-input" type="radio" name="adapt" value="普通" v-model="form.adapt" />
                     <label class="form-check-label">普通</label>
                   </div>
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="status" value="SUBMITTED" v-model="form.status" />
+                    <input class="form-check-input" type="radio" name="adapt" value="尚待觀察" v-model="form.adapt" />
                     <label class="form-check-label">尚待觀察</label>
                   </div>
                 </div>
@@ -117,10 +117,11 @@
             <div v-if="recordsLoading" class="text-center text-muted p-3">載入中…</div>
             <div v-else-if="!records.length" class="text-center text-muted p-3">尚無回報紀錄</div>
 
-            <div v-else v-for="r in recordsSorted" :key="r.id" class="col-md-6 col-lg-4 card-col">
+            <div v-else v-for="(r, idx) in recordsSorted" :key="r.id" class="col-md-6 col-lg-4 card-col">
               <div class="card-report" @click="openModal(r)">
                 <img class="report-img" :src="safeImg(r.imageUrl)" :alt="petName(currentAdoption)" />
-                <h6 class="mb-1">{{ petName(currentAdoption) || '—' }}</h6>
+                <!-- 原本：<h6 class="mb-1">{{ petName(currentAdoption) || '—' }}</h6> -->
+                <h6 class="mb-1">第 {{ nth(idx) }} 次回報</h6>
                 <p class="mb-1"><small>日期：{{ date10(r.reportDate) || '—' }}</small></p>
                 <p class="mb-0"><small>描述：{{ r.notes || '' }}</small></p>
               </div>
@@ -179,6 +180,7 @@ const form = reactive({
   reportDate: '',          // yyyy-MM-dd
   status: 'SUBMITTED',     // 固定寫 SUBMITTED（與舊版一致）
   notes: '',
+  adapt: '',               // ← 新增：良好 / 普通 / 尚待觀察
   file: null,              // File 物件
 })
 
@@ -196,6 +198,10 @@ const recordsSorted = computed(() =>
 )
 
 // ---- Utils ----
+function nth(idx) {
+  // 最新在前 → 用總數 - 索引 當「第 N 次」
+  return recordsSorted.value.length - idx
+}
 function petName(a) {
   if (!a) return ''
   return a.petName ?? a.pet_name ?? `#${a.postIdExt ?? a.post_id_ext ?? ''}`
@@ -205,10 +211,19 @@ function date10(v) {
   const s = String(v)
   return s.length >= 10 ? s.slice(0, 10) : s
 }
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+
 function safeImg(s) {
   if (!s) return '/images/noimg.png'
-  const ok = /^(https?:\/\/|data:image\/|\/images\/|\/uploads\/|\/feedback\/)/i.test(s)
-  return ok ? s : '/images/noimg.png'
+
+  // 已經是絕對網址或 data URL → 直接用
+  if (/^(https?:\/\/|data:image\/)/i.test(s)) return s
+
+  // 我們只幫 /adopt/feedback、/adopt/uploads、/uploads 這三種補完整網址
+  if (/^\/(adopt\/(feedback|uploads)\/|uploads\/)/i.test(s)) {
+    return API + s
+  }
+  return '/images/noimg.png'
 }
 function toDataURL(file) {
   return new Promise(resolve => {
@@ -286,28 +301,41 @@ async function onSubmit() {
     }
     submitting.value = true
 
-    const payload = {
-      reportDate: form.reportDate || '',
-      notes: (form.notes || '').trim(),
-      status: form.status || 'SUBMITTED',
-      imageUrl: await toDataURL(form.file)
-    }
+  const raw   = (form.notes || '').trim();
+  const adapt = (form.adapt || '').trim();
 
-    await submitReport(state.currentId, payload)
-    alert('回報已送出！')
+  const NOTES_ADAPT = /^\s*[【\[]([^】\]]{1,6})[】\]]\s*(.*)$/;
+  function splitNotes(notes) {
+    const s = (notes || '').trim();
+    const m = s.match(NOTES_ADAPT);
+    return m ? { adapt: m[1].trim(), pure: (m[2] || '').trim() } : { adapt: '', pure: s };
+  }
 
-    // 切到紀錄、重載紀錄、重置表單
-    pane.value = 'records'
-    await loadRecords(state.currentId)
-    form.reportDate = ''
-    form.status = 'SUBMITTED'
-    form.notes = ''
-    form.file = null
-    // 清掉 input[type=file]
-    await nextTick()
-    const fileEl = document.getElementById('photo')
-    if (fileEl) fileEl.value = ''
-  } catch (e) {
+  // 狀況放最前面，用全形【】；若要含狀況一起限制 50 字：
+  const withAdaptRaw = adapt ? `【${adapt}】${raw}` : raw
+  const notesWithAdapt = withAdaptRaw.slice(0, 50)  // ← 想保留原本僅描述限 50，就拿掉這行改回 withAdaptRaw
+
+  const payload = {
+  reportDate: form.reportDate || '',
+  // 狀況寫在描述最前面（不改 DB schema）
+  notes: adapt ? `【${adapt}】${raw}` : raw,
+  status: form.status || 'SUBMITTED',
+  imageUrl: await toDataURL(form.file),
+};
+
+  await submitReport(state.currentId, payload)
+  // reset
+  pane.value = 'records'
+  await loadRecords(state.currentId)
+  form.reportDate = ''
+  form.status     = 'SUBMITTED'
+  form.notes      = ''
+  form.adapt      = ''          // ← 新增：重置狀況
+  form.file       = null
+  await nextTick()
+  const fileEl = document.getElementById('photo')
+  if (fileEl) fileEl.value = ''
+} catch (e) {
     console.error('送出失敗', e)
     alert('送出失敗，請稍後再試')
   } finally {
