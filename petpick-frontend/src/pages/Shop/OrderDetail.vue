@@ -1,68 +1,80 @@
 <!-- src/pages/Shop/OrderDetail.vue -->
 <template>
-    <main class="flex-grow-1 mt-5 pt-4">
-        <div class="container mt-5">
-            <h2 class="mb-4 text-center">訂單明細</h2>
+  <main class="flex-grow-1 mt-5 pt-4">
+    <div class="container mt-5">
+      <h2 class="mb-4 text-center">訂單明細</h2>
 
-            <!-- 抬頭 / 系統訊息 -->
-            <div id="order-info" class="mb-4" v-html="headerHtml"></div>
+      <!-- 抬頭 / 系統訊息 -->
+      <div id="order-info" class="mb-4" v-html="headerHtml"></div>
 
-            <!-- 三段式進度條（取消單自動隱藏） -->
-            <section v-show="!isCancelledStatus(order?.status)" id="order-progress" class="order-progress my-4">
-                <div class="op-steps">
-                    <div class="op-step" :class="step1Class" data-step="1">
-                        <div class="op-dot"></div>
-                        <div class="op-label">建立訂單</div>
-                        <div class="op-time" id="op-created">{{ fmtDT(order?.createdAt) || '—' }}</div>
-                    </div>
-                    <div class="op-bar" :class="bar1Class"></div>
-                    <div class="op-step" :class="step2Class" data-step="2">
-                        <div class="op-dot"></div>
-                        <div class="op-label">已出貨</div>
-                        <div class="op-time" id="op-shipped">
-                            {{ shippedTimeText }}
-                        </div>
-                    </div>
-                    <div class="op-bar" :class="bar2Class"></div>
-                    <div class="op-step" :class="step3Class" data-step="3">
-                        <div class="op-dot"></div>
-                        <div class="op-label">已配達</div>
-                        <div class="op-time" id="op-delivered">
-                            {{ deliveredTimeText }}
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 明細 -->
-            <table class="table table-bordered">
-                <thead class="thead-custom">
-                    <tr>
-                        <th>商品</th>
-                        <th>單價</th>
-                        <th>數量</th>
-                        <th>小計</th>
-                    </tr>
-                </thead>
-                <tbody id="order-items">
-                    <tr v-if="items.length === 0">
-                        <td colspan="4" class="text-muted text-center py-4">此訂單沒有明細資料</td>
-                    </tr>
-                    <tr v-for="(it, i) in items" :key="i">
-                        <td>{{ it.pname ?? it.productId ?? '' }}</td>
-                        <td>{{ fmtCurrency(unitPrice(it)) }}</td>
-                        <td>{{ Number(it.quantity) || 0 }}</td>
-                        <td>{{ fmtCurrency(subtotal(it)) }}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <!-- 總金額 -->
-            <div class="text-end fw-bold fs-5">
-                總金額：<span id="order-total">{{ fmtCurrency(total) }}</span>
-            </div>
+      <!-- 三段式進度條（取消單自動隱藏） -->
+      <section v-show="!isCancelledStatus(order?.status)" id="order-progress" class="order-progress my-4">
+        <div class="op-steps">
+          <div class="op-step" :class="step1Class" data-step="1">
+            <div class="op-dot"></div>
+            <div class="op-label">建立訂單</div>
+            <div class="op-time" id="op-created">{{ fmtDT(order?.createdAt) || '—' }}</div>
+          </div>
+          <div class="op-bar" :class="bar1Class"></div>
+          <div class="op-step" :class="step2Class" data-step="2">
+            <div class="op-dot"></div>
+            <div class="op-label">已出貨</div>
+            <div class="op-time" id="op-shipped">{{ shippedTimeText }}</div>
+          </div>
+          <div class="op-bar" :class="bar2Class"></div>
+          <div class="op-step" :class="step3Class" data-step="3">
+            <div class="op-dot"></div>
+            <div class="op-label">已配達</div>
+            <div class="op-time" id="op-delivered">{{ deliveredTimeText }}</div>
+          </div>
         </div>
-    </main>
+      </section>
+
+      <!-- 明細 -->
+      <table class="table table-bordered">
+        <thead class="thead-custom">
+          <tr>
+            <th>商品</th>
+            <th>單價</th>
+            <th>數量</th>
+            <th>小計</th>
+          </tr>
+        </thead>
+        <tbody id="order-items">
+          <tr v-if="items.length === 0">
+            <td colspan="4" class="text-muted text-center py-4">此訂單沒有明細資料</td>
+          </tr>
+          <tr v-for="(it, i) in items" :key="i">
+            <td>{{ it.pname ?? it.productId ?? '' }}</td>
+            <td>{{ fmtCurrency(unitPrice(it)) }}</td>
+            <td>{{ Number(it.quantity) || 0 }}</td>
+            <td>{{ fmtCurrency(subtotal(it)) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 金額明細（含運/折扣） -->
+      <div class="border rounded p-3 mb-2 small bg-light-subtle">
+        <div class="d-flex justify-content-between">
+          <span>商品小計</span>
+          <span>NT$ {{ itemsSubtotalDisplay }}</span>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span>運費</span>
+          <span>NT$ {{ shippingFeeDisplay }}</span>
+        </div>
+        <div class="d-flex justify-content-between" v-if="discountValue > 0">
+          <span>折扣</span>
+          <span>- NT$ {{ discountDisplay }}</span>
+        </div>
+      </div>
+
+      <!-- 總金額（含運） -->
+      <div class="text-end fw-bold fs-5">
+        總金額（含運）：<span id="order-total" class="text-danger">{{ fmtCurrency(grandTotal) }}</span>
+      </div>
+    </div>
+  </main>
 </template>
 
 <script setup>
@@ -191,16 +203,12 @@ async function loadOrder(orderId) {
   const rightNo = o.merchantTradeNo ? `（${o.merchantTradeNo}）` : ''
   lines.push(`<p><strong>訂單編號：</strong> ${leftNo}${rightNo}</p>`)
   if (o.tradeNo) {
-    lines.push(
-      `<p><strong>綠界交易序號：</strong> <span class="font-monospace">${o.tradeNo}</span></p>`
-    )
+    lines.push(`<p><strong>綠界交易序號：</strong> <span class="font-monospace">${o.tradeNo}</span></p>`)
   }
   lines.push(`<p><strong>訂購日期：</strong> ${fmtDateTime(o.createdAt)}</p>`)
   lines.push(`<p><strong>付款方式：</strong> ${paymentLabel(o)}</p>`)
   lines.push(`<p><strong>狀態：</strong> ${o.status ?? ''}</p>`)
-  lines.push(
-    `<p><strong>收件人：</strong> ${o.receiverName ?? ''}（${o.receiverPhone ?? ''}）</p>`
-  )
+  lines.push(`<p><strong>收件人：</strong> ${o.receiverName ?? ''}（${o.receiverPhone ?? ''}）</p>`)
 
   const st = String(o.shippingType || '').toLowerCase()
   let deliveryHtml = ''
@@ -261,14 +269,43 @@ function paymentLabel(o) {
   return '—'
 }
 
-/** ------- 合計 ------- */
-const total = computed(() => {
-  if (order.value?.totalPrice != null) return Number(order.value.totalPrice) || 0
+/** ------- 金額（小計/運費/折扣/總額含運） ------- */
+const itemsSubtotalValue = computed(() => {
+  // 後端有提供就取（優先順序）
+  const o = order.value || {}
+  const direct = num(o.itemsTotal, o.subtotal, o.itemsSubtotal, o.totalWithoutShipping)
+  if (direct > 0) return direct
+  // 否則用明細相加
   return items.value.reduce(
     (sum, it) => sum + num(it.subtotal, num(it.unitPrice, it.price) * num(it.quantity)),
     0
   )
 })
+const shippingFeeValue = computed(() => {
+  const o = order.value || {}
+  return num(o.shippingFee, o.shipping_fee, o.freight, o.shipping)
+})
+const discountValue = computed(() => {
+  const o = order.value || {}
+  return num(o.discount, o.discountAmount, o.couponDiscount)
+})
+const dbTotalValue = computed(() => {
+  const o = order.value || {}
+  return num(o.totalPrice, o.grandTotal, o.payable, o.amount)
+})
+const grandTotal = computed(() => {
+  // 若後端已給總額（通常已含運/折扣），直接採用；否則自行合成
+  return dbTotalValue.value > 0
+    ? dbTotalValue.value
+    : Math.max(0, itemsSubtotalValue.value + shippingFeeValue.value - discountValue.value)
+})
+
+// 顯示字串
+const itemsSubtotalDisplay = computed(() => itemsSubtotalValue.value.toLocaleString('zh-Hant-TW'))
+const shippingFeeDisplay = computed(() => shippingFeeValue.value.toLocaleString('zh-Hant-TW'))
+const discountDisplay = computed(() => discountValue.value.toLocaleString('zh-Hant-TW'))
+
+/** ------- 舊合計 API（仍用於每列小計） ------- */
 const unitPrice = (it) => num(it.unitPrice, it.price)
 const subtotal = (it) => num(it.subtotal, unitPrice(it) * num(it.quantity))
 
@@ -407,64 +444,63 @@ watch(() => route.fullPath, async () => {
 })
 </script>
 
-
 <style scoped>
 .thead-custom {
-    background-color: burlywood;
+  background-color: burlywood;
 }
 
 /* 進度條樣式（簡易，可依你現有 CSS 覆蓋） */
 .order-progress .op-steps {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .order-progress .op-step {
-    text-align: center;
-    min-width: 100px;
+  text-align: center;
+  min-width: 100px;
 }
 
 .order-progress .op-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    margin: 0 auto 6px;
-    background: #ddd;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin: 0 auto 6px;
+  background: #ddd;
 }
 
 .order-progress .op-label {
-    font-weight: 600;
-    font-size: 14px;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .order-progress .op-time {
-    font-size: 12px;
-    color: #6c757d;
-    min-height: 18px;
+  font-size: 12px;
+  color: #6c757d;
+  min-height: 18px;
 }
 
 .order-progress .op-bar {
-    flex: 1 1 auto;
-    height: 4px;
-    background: #e9ecef;
-    border-radius: 2px;
+  flex: 1 1 auto;
+  height: 4px;
+  background: #e9ecef;
+  border-radius: 2px;
 }
 
 /* 狀態樣式 */
 .op-step.active .op-dot {
-    background: #ffc107;
+  background: #ffc107;
 }
 
 .op-step.done .op-dot {
-    background: #28a745;
+  background: #28a745;
 }
 
 .op-bar.active {
-    background: #ffe08a;
+  background: #ffe08a;
 }
 
 .op-bar.done {
-    background: #28a745;
+  background: #28a745;
 }
 </style>

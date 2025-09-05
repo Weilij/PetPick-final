@@ -485,7 +485,6 @@ async function handleSubmit() {
           receiverAddr: _addr,
           isCollection: true
         })
-        showToast(`已建立宅配託運單：${j.trackingNo || j.logisticsId || '已送出'}`, 'success')
       } catch (e) {
         await markOrderFailed(createdOrderId, e.message)
         showFail(`宅配建單失敗：${e.message}`)
