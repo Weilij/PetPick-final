@@ -1,120 +1,109 @@
 <template>
   <div class="container">
-    <!-- Stepper: 置頂、滿版 -->
-    <div class="stepper mb-4">
-      <div class="step active">
-        <span class="dot">1</span>
-        <div class="label">上傳任務</div>
-      </div>
-      <div class="step-sep" aria-hidden="true"></div>
-      <div class="step">
-        <span class="dot">2</span>
-        <div class="label">任務審核中</div>
-      </div>
-      <div class="step-sep" aria-hidden="true"></div>
-      <div class="step">
-        <span class="dot">3</span>
-        <div class="label">任務上傳成功</div>
-      </div>
-    </div>
-
-    <div class="row equalize align-items-stretch">
+    <div class="row justify-content-center align-items-start">
       <!-- 任務上傳表單 -->
-      <div class="my-4 col-lg-6 col-12 d-flex">
-        <form id="taskForm" class="card flex-grow-1" @submit.prevent="onSubmit">
-          <div class="card-header">訊息</div>
-          <div class="card-body">
-            <div class="mb-3">
-              <label for="title" class="form-label">任務標題</label>
-              <input type="text" class="form-control" id="title" placeholder="幫我遛狗" required v-model.trim="form.title" />
-            </div>
+      <div class="my-5 col-lg-6 col-12">
+        <h2 class="mb-4">上傳任務</h2>
+        <form id="taskForm" @submit.prevent="onSubmit">
+          <!-- 訊息 -->
+          <div class="card mb-4">
+            <div class="card-header">訊息</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label for="title" class="form-label">任務標題</label>
+                <input type="text" class="form-control" id="title" placeholder="幫我遛狗" required
+                  v-model.trim="form.title" />
+              </div>
 
-            <div class="mb-3">
-              <label for="imageUrl" class="form-label">照片</label>
-              <input type="file" class="form-control" id="imageUrl" multiple accept="image/*" @change="onFilesChange" />
-              <small class="text-muted">最多上傳 5 張圖片</small>
-              <div id="previewImages" class="d-flex flex-wrap gap-2 mt-2">
-                <div v-for="(url, idx) in previewThumbs" :key="'thumb-' + idx" class="position-relative">
-                  <img :src="url" class="img-thumbnail" style="width:120px;height:120px;object-fit:cover" />
-                  <button type="button" class="btn btn-sm position-absolute top-0 end-0"
-                          style="transform: translate(50%,-50%)" @click="removeFile(idx)">&times;</button>
+              <div class="mb-3">
+                <label for="imageUrl" class="form-label">照片</label>
+                <input type="file" class="form-control" id="imageUrl" multiple accept="image/*"
+                  @change="onFilesChange" />
+                <small class="text-muted">最多上傳 5 張圖片</small>
+                <div id="previewImages" class="d-flex flex-wrap gap-2 mt-2">
+                  <div v-for="(url, idx) in previewThumbs" :key="'thumb-' + idx" class="position-relative">
+                    <img :src="url" class="img-thumbnail" style="width:120px;height:120px;object-fit:cover" />
+                    <button type="button" class="btn btn-sm position-absolute top-0 end-0"
+                      style="transform: translate(50%,-50%)" @click="removeFile(idx)">&times;</button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="petname" class="form-label">🐾姓名</label>
-                <input type="text" class="form-control" id="petname" required v-model.trim="form.petName" />
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="petname" class="form-label">🐾姓名</label>
+                  <input type="text" class="form-control" id="petname" required v-model.trim="form.petName" />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="petage" class="form-label">🐾年紀</label>
+                  <input type="text" class="form-control" id="petage" v-model.trim="form.petAge" />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="petgender" class="form-label">🐾性別</label>
+                  <select class="form-select" id="petgender" required v-model="form.petGender">
+                    <option value="公">公</option>
+                    <option value="母">母</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="phone" class="form-label">聯絡人電話</label>
+                  <input type="text" class="form-control" id="phone" required v-model.trim="form.contactPhone" />
+                </div>
               </div>
-              <div class="col-md-6 mb-3">
-                <label for="petage" class="form-label">🐾年紀</label>
-                <input type="text" class="form-control" id="petage" v-model.trim="form.petAge" />
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="petgender" class="form-label">🐾性別</label>
-                <select class="form-select" id="petgender" required v-model="form.petGender">
-                  <option value="公">公</option>
-                  <option value="母">母</option>
-                </select>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="phone" class="form-label">聯絡人電話</label>
-                <input type="text" class="form-control" id="phone" required v-model.trim="form.contactPhone" />
-              </div>
-            </div>
 
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="city" class="form-label">城市</label>
-                <select class="form-select" id="city" required v-model="form.city" @change="onCityChange">
-                  <option value="" disabled>請選擇城市</option>
-                  <option v-for="c in cities" :key="c" :value="c">{{ c }}</option>
-                </select>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="city" class="form-label">城市</label>
+                  <select class="form-select" id="city" required v-model="form.city" @change="onCityChange">
+                    <option value="" disabled>請選擇城市</option>
+                    <option v-for="c in cities" :key="c" :value="c">{{ c }}</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="district" class="form-label">地區</label>
+                  <select class="form-select" id="district" required :disabled="!form.city" v-model="form.district">
+                    <option value="" disabled>{{ form.city ? '請選擇地區' : '請先選擇城市' }}</option>
+                    <option v-for="d in districts" :key="d" :value="d">{{ d }}</option>
+                  </select>
+                </div>
               </div>
-              <div class="col-md-6 mb-3">
-                <label for="district" class="form-label">地區</label>
-                <select class="form-select" id="district" required :disabled="!form.city" v-model="form.district">
-                  <option value="" disabled>{{ form.city ? '請選擇地區' : '請先選擇城市' }}</option>
-                  <option v-for="d in districts" :key="d" :value="d">{{ d }}</option>
-                </select>
-              </div>
-            </div>
 
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="starttime" class="form-label">開始時間</label>
-                <input type="datetime-local" class="form-control" id="starttime" required v-model="form.startTimeRaw" :min="minDatetime" />
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="starttime" class="form-label">開始時間</label>
+                  <input type="datetime-local" class="form-control" id="starttime" required v-model="form.startTimeRaw"
+                    :min="minDatetime" />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="endtime" class="form-label">結束時間</label>
+                  <input type="datetime-local" class="form-control" id="endtime" required v-model="form.endTimeRaw"
+                    :min="minDatetime" />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="price" class="form-label">酬勞（元）</label>
+                  <input type="number" class="form-control" id="price" min="0" required v-model.number="form.price" />
+                </div>
               </div>
-              <div class="col-md-6 mb-3">
-                <label for="endtime" class="form-label">結束時間</label>
-                <input type="datetime-local" class="form-control" id="endtime" required v-model="form.endTimeRaw" :min="minDatetime" />
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="price" class="form-label">酬勞（元）</label>
-                <input type="number" class="form-control" id="price" min="0" required v-model.number="form.price" />
-              </div>
-            </div>
 
-            <div class="mb-3">
-              <label class="form-label">任務標籤（可複選）</label>
-              <div id="tag-buttons" class="d-flex flex-wrap gap-2">
-                <button v-for="t in tagDefs" :key="t.id" type="button" class="btn tag-btn"
-                        :class="isTagSelected(t.id) ? 'btn-secondary' : 'btn-outline-secondary'"
-                        @click="toggleTag(t.id)">
-                  {{ t.label }}
-                </button>
+              <div class="mb-3">
+                <label class="form-label">任務標籤（可複選）</label>
+                <div id="tag-buttons" class="d-flex flex-wrap gap-2">
+                  <button v-for="t in tagDefs" :key="t.id" type="button" class="btn tag-btn"
+                    :class="isTagSelected(t.id) ? 'btn-secondary' : 'btn-outline-secondary'" @click="toggleTag(t.id)">
+                    {{ t.label }}
+                  </button>
+                </div>
               </div>
-            </div>
-            <input type="hidden" name="tags" id="selectedTags" :value="selectedTagsArray.join(',')" />
+              <input type="hidden" name="tags" id="selectedTags" :value="selectedTagsArray.join(',')" />
 
-            <div class="mb-3">
-              <label for="description" class="form-label">任務說明</label>
-              <textarea class="form-control" id="description" rows="3" required v-model.trim="form.description"></textarea>
+              <div class="mb-3">
+                <label for="description" class="form-label">任務說明</label>
+                <textarea class="form-control" id="description" rows="3" required
+                  v-model.trim="form.description"></textarea>
+              </div>
             </div>
           </div>
-
-          <div class="card-footer text-end bg-white">
+          <div class="text-end">
             <button type="submit" class="btn" style="background-color: burlywood;" :disabled="submitting">
               {{ submitting ? '提交中…' : '提交任務' }}
             </button>
@@ -123,40 +112,34 @@
       </div>
 
       <!-- 預覽區塊 -->
-      <div class="my-4 col-lg-6 col-12 d-flex">
-        <div id="taskPreview" class="card flex-grow-1 d-flex flex-column">
-          <div class="card-header bg-white">
-            <h5 class="mb-0">任務預覽</h5>
-          </div>
-          <div class="card-body">
-            <div class="row g-0">
-              <div class="col-md-6">
-                <div id="previewCarousel" class="carousel slide h-100" data-bs-ride="carousel">
-                  <div class="carousel-inner h-100" id="carouselImages">
-                    <div v-for="(url, i) in previewSlides" :key="'slide-' + i" class="carousel-item" :class="{ active: i === 0 }">
-                      <img :src="url" class="d-block w-100 preview-img" />
-                    </div>
+      <div id="taskPreview" class="my-5 col-lg-6 col-12">
+        <h2 class="mb-4">任務預覽</h2>
+        <div class="card">
+          <div class="row g-0">
+            <div class="col-md-6">
+              <div id="previewCarousel" class="carousel slide h-100" data-bs-ride="carousel">
+                <div class="carousel-inner h-100" id="carouselImages">
+                  <div v-for="(url, i) in previewSlides" :key="'slide-' + i" class="carousel-item"
+                    :class="{ active: i === 0 }">
+                    <img :src="url" class="d-block w-100" style="height:300px;object-fit:cover" />
                   </div>
                 </div>
               </div>
-              <div class="col-md-6">
-                <div class="ps-md-3 pt-3 pt-md-0">
-                  <h5 id="previewTitle" class="card-title">{{ form.title }}</h5>
-                  <p class="mb-1"><strong>姓名：</strong><span id="previewPetName">{{ form.petName }}</span></p>
-                  <p class="mb-1"><strong>年紀：</strong><span id="previewPetAge">{{ form.petAge }}</span></p>
-                  <p class="mb-1"><strong>性別：</strong><span id="previewPetGender">{{ form.petGender }}</span></p>
-                  <p class="mb-1"><strong>緊急聯絡人電話：</strong><span id="previewPhone">{{ form.contactPhone }}</span></p>
-                  <p class="mb-1"><strong>地點：</strong><span id="previewLocation">{{ previewLocation }}</span></p>
-                  <p class="mb-1">
-                    <strong>時間：</strong>
-                    <span id="previewStartTime">{{ fmtPreview(form.startTimeRaw) }}</span>
-                    ~
-                    <span id="previewEndTime">{{ fmtPreview(form.endTimeRaw) }}</span>
-                  </p>
-                  <p class="mb-1"><strong>酬勞：</strong><span id="previewPrice">{{ form.price }}</span> 元</p>
-                  <p class="card-text"><strong>任務詳情：</strong><span id="previewDescription">{{ form.description }}</span></p>
-                  <p><span class="mission-tag" id="previewTag">{{ selectedTagsText }}</span></p>
-                </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card-body">
+                <h5 id="previewTitle" class="card-title">{{ form.title }}</h5>
+                <p class="mb-1"><strong>姓名：</strong><span id="previewPetName">{{ form.petName }}</span></p>
+                <p class="mb-1"><strong>年紀：</strong><span id="previewPetAge">{{ form.petAge }}</span></p>
+                <p class="mb-1"><strong>性別：</strong><span id="previewPetGender">{{ form.petGender }}</span></p>
+                <p class="mb-1"><strong>緊急聯絡人電話：</strong><span id="previewPhone">{{ form.contactPhone }}</span></p>
+                <p class="mb-1"><strong>地點：</strong><span id="previewLocation">{{ previewLocation }}</span></p>
+                <p class="mb-1"><strong>時間：</strong><span id="previewStartTime">{{ fmtPreview(form.startTimeRaw)
+                    }}</span> ~ <span id="previewEndTime">{{ fmtPreview(form.endTimeRaw) }}</span></p>
+                <p class="mb-1"><strong>酬勞：</strong><span id="previewPrice">{{ form.price }}</span> 元</p>
+                <p class="card-text"><strong>任務詳情：</strong><span id="previewDescription">{{ form.description }}</span>
+                </p>
+                <p><span class="mission-tag" id="previewTag">{{ selectedTagsText }}</span></p>
               </div>
             </div>
           </div>
@@ -171,11 +154,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import http from '@/utils/http'
-import { useUploadJobStore } from '@/stores/uploadJob'
 
 const router = useRouter()
 const userStore = useUserStore()
-const uploadJob = useUploadJobStore()
 
 // ✅ 使用 store 的認證狀態
 const auth = computed(() => ({
@@ -337,7 +318,6 @@ async function onSubmit() {
   if (ed < now) { alert('結束時間不能早於現在'); return }
   if (ed <= s) { alert('結束時間必須晚於開始時間'); return }
 
-  // 只組裝 payload，圖片與資料交由 Review 頁面做審核與上傳
   const payload = {
     posterId: auth.value.uid,
     title: form.title.trim(),
@@ -354,14 +334,46 @@ async function onSubmit() {
     tags: selectedTagsArray.value,
   }
 
+  const fd = new FormData()
+  fd.append('data', JSON.stringify(payload))
 
-  uploadJob.setJob(payload, selectedFiles.value)
-  console.log('[Upload] job saved in Pinia:', uploadJob.$state)
+  // 加上圖片
+  selectedFiles.value.slice(0, 5).forEach(f => {
+    fd.append('images', f)
+  })
 
-  // 跳轉到審核頁（在該頁做圖片審核與真正上傳）
   submitting.value = true
   try {
-    await router.push('/missions/upload/review')
+    console.log('🚀 開始上傳任務:', payload)
+
+    const response = await http.post('/api/missions/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+
+    console.log('✅ 上傳成功:')
+    alert('✅ 上傳成功')
+
+    // 可視需要清空表單或導向其他頁面
+    resetForm()
+    // router.push('/missions') // 導向任務列表頁面
+
+  } catch (err) {
+    console.error('💥 上傳失敗:', err)
+
+    if (err.response?.status === 401) {
+      alert('❌ 認證已過期，請重新登入')
+      localStorage.removeItem('auth')
+      sessionStorage.setItem('redirect', '/missions/upload')
+      router.push('/login')
+    } else if (err.response?.status === 400) {
+      alert(`❌ 資料格式錯誤: ${err.response?.data?.message || '請檢查填寫內容'}`)
+    } else if (err.response?.status === 403) {
+      alert('❌ 沒有權限上傳任務')
+    } else if (err.response?.status === 413) {
+      alert('❌ 檔案太大，請選擇較小的圖片')
+    } else {
+      alert(`❌ 上傳失敗: ${err.response?.data?.message || err.message}`)
+    }
   } finally {
     submitting.value = false
   }
@@ -427,25 +439,4 @@ function resetForm() {
   background-color: #cccccc !important;
   cursor: not-allowed;
 }
-
-/* ===== Stepper ===== */
-.stepper { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.step { display:flex; flex-direction:column; align-items:center; min-width:110px; }
-.step .dot { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; background:#e9ecef; color:#6c757d; }
-.step .label { margin-top:6px; font-size:0.9rem; color:#6c757d; text-align:center; }
-.step.active .dot { background:burlywood; color:#fff; }
-.step.active .label { color:#000; font-weight:600; }
-.step-sep { flex:1 1 auto; height:2px; background:#e9ecef; }
-@media (max-width: 576px){
-  .step { min-width:auto; }
-  .step .label { font-size:0.8rem; }
-}
-
-/* 讓左右兩側卡片等高 */
-.equalize > [class*="col-"] { display: flex; }
-.equalize .card { display: flex; flex-direction: column; flex: 1 1 auto; }
-
-/* 預覽圖片固定高度並等比裁切 */
-.preview-img { height: 300px; object-fit: cover; }
 </style>
-
