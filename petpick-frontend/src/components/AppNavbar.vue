@@ -6,7 +6,7 @@
         <span class="fw-semibold">PetPick</span>
       </RouterLink>
 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      <button ref="togglerRef" class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -72,22 +72,23 @@
               </RouterLink>
 
               <ul v-show="user.isLogin" class="dropdown-menu dropdown-menu-end shadow">
-                <li>
-                  <RouterLink class="dropdown-item" to="/adminOrders" target="_blank" rel="noopener noreferrer">後臺管理</RouterLink>
-                </li>
+                <li v-if="user.role === 'ADMIN'">
+  <RouterLink     class="dropdown-item"  to="/adminOrders"  target="_blank"  rel="noopener noreferrer" > 後臺管理 </RouterLink>
+</li>
+                <li v-if="user.role === 'ADMIN'">
+  <hr class="dropdown-divider" /></li>
+
                 <li>
                   <RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink>
                 </li>
-                 <li>
-                  <RouterLink class="dropdown-item" to="/my-adopt-progress">我的貼文</RouterLink>
+                <li v-if="user.role === 'USER'">  <hr class="dropdown-divider" /></li>
+                 <li v-if="user.role === 'USER'">
+                  <RouterLink class="dropdown-item" to="/my-adopt-progress">刊登與申請</RouterLink>
                 </li>
-                 <li>
-                  <RouterLink class="dropdown-item" to="/my-apply">我的申請</RouterLink>
-                </li>
-                <li>
+                <li v-if="user.role === 'USER'">
                   <RouterLink class="dropdown-item" to="/order">我的訂單</RouterLink>
                 </li>
-                <li>
+                <li v-if="user.role === 'USER'">
                   <RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink>
                 </li>
                 <li>
@@ -110,7 +111,7 @@ import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
 import Realtime from '@/common/realtime'
 import axios from '@/utils/http'
-import { Dropdown } from 'bootstrap'
+import { Dropdown, Collapse} from 'bootstrap'
 
 const user = useUserStore()
 const cart = useCartStore()
@@ -118,8 +119,9 @@ const route = useRoute()
 const router = useRouter()
 
 const accountBtnRef = ref(null)
+const togglerRef = ref(null) 
 let dd = null
-
+let navCollapse = null
 let disposeRealtime = null
 let realtimeStarted = false
 
@@ -149,6 +151,17 @@ onMounted(() => {
       dd = Dropdown.getOrCreateInstance(accountBtnRef.value, { autoClose: true })
     }
   })
+
+  const el = document.getElementById('navbarNav')
+  if (el) {
+    navCollapse = Collapse.getOrCreateInstance(el, { toggle: false })
+  }
+
+  togglerRef.value?.addEventListener('click', () => navCollapse?.toggle?.())
+})
+
+watch(() => route.fullPath, () => {
+  navCollapse?.hide?.() // 切頁自動收起
 })
 
 watch(
@@ -186,6 +199,7 @@ onUnmounted(() => {
     dd.dispose()
     dd = null
   }
+  navCollapse = null
   if (typeof disposeRealtime === 'function') disposeRealtime()
   disposeRealtime = null
   realtimeStarted = false

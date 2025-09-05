@@ -71,7 +71,7 @@ const router = createRouter({
     { path: '/rename', name: 'rename', component: Rename, meta: { requiresAuth: true } },
     { path: '/reset-password', name: 'resetPassword', component: ResetPassword },
     { path: '/register-success', name: 'registerSuccess', component: RegisterSuccess },
-    { path: '/adminview', name: 'adminView', component: AdminView },
+    { path: '/adminview', name: 'adminView', component: AdminView ,meta: { hideNavbar: true, hideFooter: true }},
 
 
     //Shop

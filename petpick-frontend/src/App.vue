@@ -4,11 +4,22 @@ import AppFooter from './components/AppFooter.vue'
 </script>
 
 <template>
-  <!-- 只有沒設定 hideNavbar 才顯示 -->
-  <AppNavbar v-if="!$route.meta?.hideNavbar" />
+  <div class="layout-root">
+    <AppNavbar v-if="!$route.meta?.hideNavbar" />
 
-  <router-view />
+    <router-view class="layout-main" />
 
-  <!-- 只有沒設定 hideFooter 才顯示（可選） -->
-  <AppFooter v-if="!$route.meta?.hideFooter" />
+    <AppFooter v-if="!$route.meta?.hideFooter" />
+  </div>
 </template>
+
+<style>
+.layout-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.layout-main {
+  flex: 1 0 auto;
+}
+</style>
