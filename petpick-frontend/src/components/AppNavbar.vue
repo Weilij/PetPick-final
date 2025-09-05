@@ -72,22 +72,23 @@
               </RouterLink>
 
               <ul v-show="user.isLogin" class="dropdown-menu dropdown-menu-end shadow">
-                <li>
-                  <RouterLink class="dropdown-item" to="/adminOrders" target="_blank" rel="noopener noreferrer">後臺管理</RouterLink>
-                </li>
+                <li v-if="user.role === 'ADMIN'">
+  <RouterLink     class="dropdown-item"  to="/adminOrders"  target="_blank"  rel="noopener noreferrer" > 後臺管理 </RouterLink>
+</li>
+                <li v-if="user.role === 'ADMIN'">
+  <hr class="dropdown-divider" /></li>
+
                 <li>
                   <RouterLink class="dropdown-item" to="/Rename">我的資料</RouterLink>
                 </li>
-                 <li>
-                  <RouterLink class="dropdown-item" to="/my-adopt-progress">我的貼文</RouterLink>
+                <li v-if="user.role === 'USER'">  <hr class="dropdown-divider" /></li>
+                 <li v-if="user.role === 'USER'">
+                  <RouterLink class="dropdown-item" to="/my-adopt-progress">刊登與申請</RouterLink>
                 </li>
-                 <li>
-                  <RouterLink class="dropdown-item" to="/my-apply">我的申請</RouterLink>
-                </li>
-                <li>
+                <li v-if="user.role === 'USER'">
                   <RouterLink class="dropdown-item" to="/order">我的訂單</RouterLink>
                 </li>
-                <li>
+                <li v-if="user.role === 'USER'">
                   <RouterLink class="dropdown-item" to="/missions/application">我的任務</RouterLink>
                 </li>
                 <li>
