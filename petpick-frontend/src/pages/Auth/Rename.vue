@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, toRaw } from 'vue'
 import http from '@/utils/http'
 import { useUserStore } from '@/stores/user'
 
@@ -139,147 +139,161 @@ const uid = user.userId
 
 const tab = ref('update')
 const saving = ref(false)
-const msg = reactive({ success:'', error:'' })
+const msg = reactive({ success: '', error: '' })
 
 const form = reactive({
   username: '', gender: '', phonenumber: '',
-  city: '', district: '', experience: '有', daily: '正常作息（7:00-9:00起床）',
+  city: '', district: '', experience: '有',
+  daily: '正常作息（7:00-9:00起床）',
   petList: [], petActivitiesList: []
 })
 
-const pwd = reactive({ currentPassword:'', newPassword:'', confirmPassword:'' })
+const pwd = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
 
 // 城市/地區
 const TW_AREAS = {
-  '臺北市':['中正區','大同區','中山區','松山區','大安區','萬華區','信義區','士林區','北投區','內湖區','南港區','文山區'],
-  '新北市':['板橋區','新莊區','中和區','永和區','蘆洲區','三重區','汐止區','淡水區','土城區','樹林區','三峽區','鶯歌區','林口區','泰山區','五股區'],
-  '桃園市':['桃園區','中壢區','平鎮區','八德區','龜山區','蘆竹區','大園區','楊梅區'],
-  '臺中市':['中區','東區','南區','西區','北區','北屯區','西屯區','南屯區','太平區','大里區','豐原區','清水區'],
-  '高雄市':['新興區','前金區','苓雅區','鹽埕區','鼓山區','左營區','三民區','楠梓區','小港區','鳳山區','岡山區']
+  '臺北市': ['中正區','大同區','中山區','松山區','大安區','萬華區','信義區','士林區','北投區','內湖區','南港區','文山區'],
+  '新北市': ['板橋區','新莊區','中和區','永和區','蘆洲區','三重區','汐止區','淡水區','土城區','樹林區','三峽區','鶯歌區','林口區','泰山區','五股區'],
+  '桃園市': ['桃園區','中壢區','平鎮區','八德區','龜山區','蘆竹區','大園區','楊梅區'],
+  '臺中市': ['中區','東區','南區','西區','北區','北屯區','西屯區','南屯區','太平區','大里區','豐原區','清水區'],
+  '高雄市': ['新興區','前金區','苓雅區','鹽埕區','鼓山區','左營區','三民區','楠梓區','小港區','鳳山區','岡山區']
 }
 const cities = Object.keys(TW_AREAS)
-const districts = computed(()=> form.city ? (TW_AREAS[form.city] || []) : [])
-function onCityChange(){ if (!districts.value.includes(form.district)) form.district='' }
+const districts = computed(() => form.city ? (TW_AREAS[form.city] || []) : [])
+function onCityChange() { if (!districts.value.includes(form.district)) form.district = '' }
 
 const personalityOptions = [
-  { val:'p1', text:'個性活潑型' },
-  { val:'p2', text:'個性安靜型' },
-  { val:'p3', text:'接受怕生的' }
+  { val: 'p1', text: '個性活潑型' },
+  { val: 'p2', text: '個性安靜型' },
+  { val: 'p3', text: '接受怕生的' }
 ]
 
 // 載入個人資料
-async function loadProfile(){
-  try{
-const response = await http.get('/api/auth/me')
+async function loadProfile() {
+  try {
+    const response = await http.get('/api/auth/me')
     const data = response.data
-    
+
+    // ✅ 從後端的 "user" 拿資料
+    const user = data.user || {}
+
     Object.assign(form, {
-      username: data.username ?? '',
-      gender: data.gender ?? '',
-      phonenumber: data.phonenumber ?? '',
-      city: data.city ?? '',
-      district: data.district ?? '',
-      experience: data.experience ?? '有',
-      daily: data.daily ?? '正常作息（7:00-9:00起床）',
-      petList: Array.isArray(data.petList) ? data.petList : [],
-      petActivitiesList: Array.isArray(data.petActivitiesList) ? data.petActivitiesList : []
+      username: user.username ?? '',
+      gender: user.gender ?? '',
+      phonenumber: user.phonenumber ?? '',
+      city: user.city ?? '',
+      district: user.district ?? '',
+      experience: user.experience ?? '有',
+      daily: user.daily ?? '正常作息（7:00-9:00起床）',
+      // ✅ fallback: 如果後端回傳 pet/pet_activities（字串），轉成陣列
+      petList: Array.isArray(user.petList) ? user.petList : (user.pet ? user.pet.split(",") : []),
+      petActivitiesList: Array.isArray(user.petActivitiesList) ? user.petActivitiesList : (user.pet_activities ? user.pet_activities.split(",") : [])
     })
-    
-    console.log('✅ 個人資料載入成功:', data)
-  } catch(e) { 
+
+    console.log('✅ 個人資料載入成功:', user)
+  } catch (e) {
     console.error('❌ 載入個人資料失敗:', e)
     msg.error = '載入個人資料失敗'
   }
 }
 
-function resetProfile(){ 
+function resetProfile() {
   loadProfile()
 }
 
-async function onSaveProfile(){
+async function onSaveProfile() {
   msg.success = ''
   msg.error = ''
   saving.value = true
-  
-  try{
-    const response = await http.put(`/api/users/${uid}`, form)
-    
+
+  try {
+    // 🚨 確保一定送陣列（即使是 null 也轉 []）
+    const payload = {
+      ...toRaw(form),
+      petList: Array.isArray(form.petList) ? form.petList : [],
+      petActivitiesList: Array.isArray(form.petActivitiesList) ? form.petActivitiesList : []
+    }
+
+    console.log("🚀 送出的 JSON:", JSON.stringify(payload, null, 2))
+
+const response = await http.put('/api/user/update', payload)
+
     console.log('✅ 個人資料更新成功:', response.data)
     msg.success = '已更新個人資料'
-    
-  } catch(e) { 
+
+  } catch (e) {
     console.error('❌ 更新個人資料失敗:', e)
     msg.error = e?.response?.data?.message || '更新失敗'
-  } finally { 
-    saving.value = false 
+  } finally {
+    saving.value = false
   }
 }
 
-async function onChangePassword(){
-  if (pwd.newPassword !== pwd.confirmPassword) { 
+
+async function onChangePassword() {
+  if (pwd.newPassword !== pwd.confirmPassword) {
     msg.error = '兩次新密碼不一致'
     return
   }
-  
+
   msg.success = ''
   msg.error = ''
   saving.value = true
-  
-  try{
+
+  try {
     const response = await http.put(`/api/users/${uid}/password`, {
       password: pwd.newPassword,
       currentPassword: pwd.currentPassword
     })
-    
+
     console.log('✅ 密碼更新成功:', response.data)
     msg.success = '已更新密碼'
-    
-    // 清空密碼欄位
+
     Object.assign(pwd, {
       currentPassword: '',
       newPassword: '',
       confirmPassword: ''
     })
-    
-  } catch(e) { 
+
+  } catch (e) {
     console.error('❌ 密碼更新失敗:', e)
     msg.error = e?.response?.data?.message || '密碼更新失敗'
-  } finally { 
-    saving.value = false 
+  } finally {
+    saving.value = false
   }
 }
 
-async function onDeleteAccount(){
+async function onDeleteAccount() {
   if (!confirm('確認刪除帳號？此操作不可復原')) return
-  
+
   msg.success = ''
   msg.error = ''
   saving.value = true
-  
-  try{
+
+  try {
     const response = await http.delete(`/api/users/${uid}`, {
       params: { reason: '用戶主動刪除帳號' }
     })
-    
+
     console.log('✅ 帳號刪除成功:', response.data)
     msg.success = '帳號已刪除'
-    
-    // 登出並導回首頁
+
     setTimeout(() => {
       user.logout()
       window.location.href = '/'
     }, 2000)
-    
-  } catch(e) { 
+
+  } catch (e) {
     console.error('❌ 刪除帳號失敗:', e)
     msg.error = e?.response?.data?.message || '刪除失敗'
-  } finally { 
-    saving.value = false 
+  } finally {
+    saving.value = false
   }
 }
 
 onMounted(loadProfile)
 </script>
+
 
 <style scoped>
 .page-title{ font-weight:700; }
