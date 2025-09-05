@@ -16,9 +16,18 @@
         <div class="bg-white rounded-3 shadow-sm p-3">
           <img id="mainImg" class="img-fluid rounded" :src="state.mainImg" :alt="state.displayName" />
           <div id="thumbs" class="d-flex gap-2 mt-3 flex-wrap">
-            <img v-for="(url, i) in thumbs" :key="i" :src="url" :alt="`${state.displayName} 縮圖`" width="72" height="72"
-              class="thumb rounded" :class="{ active: state.mainImg === url }" style="cursor:pointer;object-fit:cover"
-              @click="state.mainImg = url" />
+            <img
+              v-for="(url, i) in thumbs"
+              :key="i"
+              :src="url"
+              :alt="`${state.displayName} 縮圖`"
+              width="72"
+              height="72"
+              class="thumb rounded"
+              :class="{ active: state.mainImg === url }"
+              style="cursor:pointer;object-fit:cover"
+              @click="state.mainImg = url"
+            />
           </div>
         </div>
       </div>
@@ -44,8 +53,15 @@
             <label class="form-label m-0">數量</label>
             <div class="input-group" style="max-width: 180px;">
               <button class="btn btn-outline-secondary" type="button" id="qtyMinus" @click="dec">−</button>
-              <input id="qty" type="number" class="form-control text-center" min="1" step="1" v-model.number="state.qty"
-                @input="normalizeQty" />
+              <input
+                id="qty"
+                type="number"
+                class="form-control text-center no-spinner"
+                min="1"
+                step="1"
+                v-model.number="state.qty"
+                @input="normalizeQty"
+              />
               <button class="btn btn-outline-secondary" type="button" id="qtyPlus" @click="inc">＋</button>
             </div>
 
@@ -58,8 +74,13 @@
           </div>
 
           <div class="d-flex flex-wrap gap-3">
-            <button id="btn-addToCart" class="btn btn-primary btn-lg" type="button" :disabled="stockState === 'out'"
-              @click="onAddToCart">
+            <button
+              id="btn-addToCart"
+              class="btn btn-primary btn-lg"
+              type="button"
+              :disabled="stockState === 'out'"
+              @click="onAddToCart"
+            >
               {{ stockState === 'out' ? '補貨中' : '加入購物車' }}
             </button>
             <RouterLink to="/shop/commodity" class="btn btn-outline-secondary">回商品列表</RouterLink>
@@ -73,8 +94,14 @@
 
     <!-- Toast 容器（右下角） -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080">
-      <div id="tipToast" class="toast align-items-center shadow" role="alert" aria-live="assertive" aria-atomic="true"
-        style="background: #22c55e; color: white; border-radius:12px;">
+      <div
+        id="tipToast"
+        class="toast align-items-center shadow"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        style="background: #22c55e; color: white; border-radius:12px;"
+      >
         <div class="d-flex">
           <div class="toast-body" id="toastText">已加入購物車</div>
         </div>
@@ -221,5 +248,17 @@ onMounted(loadProduct)
 <style scoped>
 .thumb.active {
   outline: 2px solid #0d6efd;
+}
+
+/* 移除 number input 內建加減箭頭 */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Firefox */
+.no-spinner[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 </style>
