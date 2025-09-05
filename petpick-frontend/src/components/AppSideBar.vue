@@ -4,11 +4,12 @@
     <div class="position-sticky pt-3">
       <ul class="nav flex-column">
         <li class="nav-item">
-          <a
+          <RouterLink
             class="nav-link"
-            :class="{ active: active === 'member' }"
-            href="adminview"
-          >會員管理</a>
+            :class="{ active: active === 'members' }"
+            :aria-current="currentKey === 'members' ? 'page' : null"
+            to="adminview"
+          >會員管理</RouterLink>
         </li>
         <li class="nav-item">
           <RouterLink
