@@ -4,7 +4,7 @@
     <div class="container mt-5">
       <h2 class="mb-4 text-center">訂單明細</h2>
 
-      <!-- 抬頭 / 系統訊息 -->
+      <!-- 抬頭 / 系統訊息（依靜態稿美化） -->
       <div id="order-info" class="mb-4" v-html="headerHtml"></div>
 
       <!-- 三段式進度條（取消單自動隱藏） -->
@@ -86,15 +86,24 @@ import http from '@/utils/http'
 const route = useRoute()
 const userId = Number(sessionStorage.getItem('checkout_user_id')) || 1
 
-const order = ref(null)          // 整張訂單抬頭
-const items = ref([])            // 明細
-const headerHtml = ref('')       // 抬頭 HTML
-let pollTimer = null             // 進度條輪詢
+const order = ref(null)
+const items = ref([])
+const headerHtml = ref('')
+let pollTimer = null
 
 /** ------- 工具 ------- */
+const esc = (s) =>
+  String(s ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+
 const num = (...vals) => {
   for (const v of vals) {
-    const n = Number(v)
+    const x = (v && typeof v === 'object' && 'value' in v) ? v.value : v
+    const n = Number(x)
     if (Number.isFinite(n)) return n
   }
   return 0
@@ -149,7 +158,7 @@ const isCancelledStatus = (s) => {
   return k === 'cancelled' || k === 'canceled' || raw === '取消'
 }
 
-/** ------- 解析要查的 orderId（順序：query.orderId → mtn → tradeNo → session → 最新一筆） ------- */
+/** ------- 解析 orderId ------- */
 async function resolveOrderId() {
   const mtnParam = route.query.mtn || route.query.MerchantTradeNo
   const tradeNoParam = route.query.tradeNo || route.query.TradeNo
@@ -182,7 +191,7 @@ async function resolveOrderId() {
   return null
 }
 
-/** ------- 載入訂單抬頭 + 明細 + 組抬頭 HTML ------- */
+// 覆蓋整個 loadOrder：抬頭改為「單欄」直式資訊、付款方式純文字、移除所有 badge
 async function loadOrder(orderId) {
   // 抬頭
   const res = await http.get(`/api/orders/${encodeURIComponent(orderId)}`)
@@ -197,93 +206,124 @@ async function loadOrder(orderId) {
   }
   items.value = Array.isArray(its) ? its : []
 
-  // 抬頭 HTML
-  const lines = []
-  const leftNo = `#${o.orderId}`
-  const rightNo = o.merchantTradeNo ? `（${o.merchantTradeNo}）` : ''
-  lines.push(`<p><strong>訂單編號：</strong> ${leftNo}${rightNo}</p>`)
-  if (o.tradeNo) {
-    lines.push(`<p><strong>綠界交易序號：</strong> <span class="font-monospace">${o.tradeNo}</span></p>`)
-  }
-  lines.push(`<p><strong>訂購日期：</strong> ${fmtDateTime(o.createdAt)}</p>`)
-  lines.push(`<p><strong>付款方式：</strong> ${paymentLabel(o)}</p>`)
-  lines.push(`<p><strong>狀態：</strong> ${o.status ?? ''}</p>`)
-  lines.push(`<p><strong>收件人：</strong> ${o.receiverName ?? ''}（${o.receiverPhone ?? ''}）</p>`)
-
+  // 配送方式字串
   const st = String(o.shippingType || '').toLowerCase()
   let deliveryHtml = ''
   if (st === 'cvs_cod') {
     const brand = o.storeBrand || ''
     const parts = [brand, o.storeName, o.storeAddress].filter(Boolean).join(' ')
-    deliveryHtml = `超商取貨付款${parts ? `（${parts}）` : ''}`
+    deliveryHtml = `超商取貨付款${parts ? `（${esc(parts)}）` : ''}`
   } else if (st === 'address') {
-    deliveryHtml = `宅配 ${o.addr || ''}`
+    deliveryHtml = `宅配 ${esc(o.addr || '')}`
   } else {
     const where = o.addr || o.storeName || ''
-    const extra = o.storeAddress ? `（${o.storeAddress}）` : ''
-    deliveryHtml = `${o.shippingType || ''} ${where}${extra}`
+    const extra = o.storeAddress ? `（${esc(o.storeAddress)}）` : ''
+    deliveryHtml = `${esc(o.shippingType || '')} ${esc(where)}${extra}`
   }
-  lines.push(`<p><strong>配送方式：</strong> ${deliveryHtml}</p>`)
 
-  headerHtml.value = lines.join('\n')
+  const rightNo = o.merchantTradeNo ? `（${esc(o.merchantTradeNo)}）` : ''
+
+  // 抬頭 HTML：單欄直式呈現（每行一個欄位）
+  headerHtml.value = `
+    <div class="card shadow-sm border-0">
+      <div class="card-body py-3">
+        <div class="h5 mb-1">訂單編號： <span class="font-monospace">#${esc(o.orderId)}</span> ${rightNo}</div>
+        <div class="small"><span class="text-muted">付款方式：</span><strong>${esc(paymentLabel(o))}</strong></div>
+        <div class="small mt-1"><span class="text-muted">配送方式：</span><strong>${deliveryHtml}</strong></div>
+        <div class="small mt-1"><span class="text-muted">收件人：</span><strong>${esc(o.receiverName ?? '')}</strong>（${esc(o.receiverPhone ?? '')}）</div>
+        ${o.tradeNo ? `
+          <div class="small mt-1"><span class="text-muted">綠界交易序號：</span><span class="font-monospace">${esc(o.tradeNo)}</span></div>
+        ` : ''}
+        ${o.trackingNo ? `
+          <div class="small mt-1"><span class="text-muted">物流追蹤碼：</span><span class="font-monospace">${esc(o.trackingNo)}</span></div>
+        ` : ''}
+      </div>
+    </div>
+  `
 }
 
-/** 付款方式推論 */
+/** 付款方式（完整來源偵測 + 對照 + 正確優先順序） */
+/** 付款方式（Query → Order → 線上訊號 → COD → Session → 預設） */
 function paymentLabel(o) {
-  const urlPayType = String(route.query.PaymentType || route.query.paymentType || '').toUpperCase()
-  const lastPay = (sessionStorage.getItem('last_payment') || '').toLowerCase()
+  const q = route.query || {}
 
-  const mapFromCode = (code) => {
-    const s = String(code || '').toUpperCase()
-    if (s.startsWith('CREDIT')) return '信用卡'
-    if (s.startsWith('WEBATM')) return '網路 ATM'
-    if (s.startsWith('ATM')) return 'ATM 轉帳'
-    if (s.startsWith('CVS')) return '超商代碼'
-    if (s.startsWith('BARCODE')) return '超商條碼'
-    return s || ''
-  }
-  const mapFromLast = (s) => {
-    const k = s.toLowerCase()
-    if (k === 'credit') return '信用卡'
-    if (k === 'webatm') return '網路 ATM'
-    if (k === 'atm') return 'ATM 轉帳'
-    if (k === 'cvs') return '超商代碼'
-    if (k === 'cod') return '貨到付款'
-    if (k === 'cash') return '現金'
+  // 同時在 Query 與 Order 物件上找（大小寫與常見別名都支援）
+  const pick = (...keys) => {
+    for (const k of keys) {
+      if (q[k] != null && q[k] !== '') return q[k]
+      if (o && o[k] != null && o[k] !== '') return o[k]
+    }
     return ''
   }
 
-  if (urlPayType) return mapFromCode(urlPayType.split('_')[0])
-  if (lastPay) {
-    const m = mapFromLast(lastPay)
-    if (m) return m
+  // 可能出現的位置（ECPay 會有 PaymentType / ChoosePayment）
+  const rawExplicit = pick(
+    'PaymentType', 'ChoosePayment', 'paymentType', 'payment_type',
+    'PayType', 'payType', 'method', 'pay', 'payMethod',
+    'paymentMethod', 'paymentMethodName', 'gatewayMethod'
+  )
+
+  const normalize = (s) => {
+    if (!s) return ''
+    // 例如 Credit_CreditCard → CREDIT；"信用卡" 則會保持中文（後面會直接用原字）
+    const head = String(s).trim()
+    const code = head.split(/[_\s-]/)[0].toUpperCase()
+    return { head, code }
   }
-  const gw = String(o.paymentGateway || o.gateway || '').toLowerCase()
-  if (gw.includes('ecpay')) return '線上付款（ECPay）'
-  if (gw.includes('cash')) return '現金'
-  if (gw.includes('bank') || gw.includes('transfer')) return '銀行轉帳'
-  const shipType = String(o.shippingType || '').toLowerCase()
-  if (shipType === 'cvs_cod') return '超商取貨付款'
-  if (o.tradeNo || o.merchantTradeNo) return '線上付款'
-  if (String(o.status || '').toLowerCase() === 'paid') return '線上付款'
+
+  const zh = (code) => ({
+    CREDIT: '信用卡',
+    CREDITCARD: '信用卡',
+    WEBATM: '網路 ATM',
+    ATM: 'ATM 轉帳',
+    VACC: 'ATM 轉帳',      // ECPay Virtual Account
+    CVS: '超商代碼',
+    BARCODE: '超商條碼',
+    APPLEPAY: 'Apple Pay',
+    GOOGLEPAY: 'Google Pay',
+    LINEPAY: 'LINE Pay',
+    UNIONPAY: '銀聯卡',
+    SAMSUNGPAY: 'Samsung Pay',
+    COD: '貨到付款',
+    CASH: '現金'
+  }[code] || '')
+
+  // 1) 有明確聲明就直接用
+  if (rawExplicit) {
+    const { head, code } = normalize(rawExplicit)
+    const label = zh(code)
+    sessionStorage.setItem('last_payment', (label || code || head).toLowerCase())
+    // 若是中文（例如後端直接回「信用卡」），就用原字；否則用對應中文 / 代碼
+    return label || (/[^\x00-\x7F]/.test(head) ? head : code || head)
+  }
+
+  // 2) 線上付款強烈訊號（但無法確定是哪一種時，顯示「線上付款」避免誤判 COD）
+  const gw = String(o?.paymentGateway || o?.gateway || '').toLowerCase()
+  const hasOnlineSignal =
+    !!o?.tradeNo || !!o?.merchantTradeNo || gw.includes('ecpay') ||
+    String(o?.status || '').toLowerCase() === 'paid'
+  if (hasOnlineSignal) return '信用卡'
+
+  // 3) 明確是貨到付款才顯示 COD（避免誤判）
+  const shipType = String(o?.shippingType || '').toLowerCase()
+  if (shipType.includes('cod')) return '貨到付款'
+
+  // 4) 最後才用 session 過去紀錄當作 fallback
+  const last = (sessionStorage.getItem('last_payment') || '').toUpperCase()
+  if (last) return zh(last) || last
+
+  // 5) 實在無從判斷
   return '—'
 }
-
 /** ------- 金額（小計/運費/折扣/總額含運） ------- */
 const itemsSubtotalValue = computed(() => {
-  // 後端有提供就取（優先順序）
   const o = order.value || {}
   const direct = num(o.itemsTotal, o.subtotal, o.itemsSubtotal, o.totalWithoutShipping)
   if (direct > 0) return direct
-  // 否則用明細相加
   return items.value.reduce(
     (sum, it) => sum + num(it.subtotal, num(it.unitPrice, it.price) * num(it.quantity)),
     0
   )
-})
-const shippingFeeValue = computed(() => {
-  const o = order.value || {}
-  return num(o.shippingFee, o.shipping_fee, o.freight, o.shipping)
 })
 const discountValue = computed(() => {
   const o = order.value || {}
@@ -293,8 +333,15 @@ const dbTotalValue = computed(() => {
   const o = order.value || {}
   return num(o.totalPrice, o.grandTotal, o.payable, o.amount)
 })
+// 運費：優先後端，否則用「總額 - 小計 + 折扣」回推
+const shippingFeeValue = computed(() => {
+  const o = order.value || {}
+  const explicit = num(o.shippingFee, o.shipping_fee, o.freight, o.shipping)
+  if (explicit > 0) return explicit
+  const diff = dbTotalValue.value - itemsSubtotalValue.value + discountValue.value
+  return diff > 0 ? diff : 0
+})
 const grandTotal = computed(() => {
-  // 若後端已給總額（通常已含運/折扣），直接採用；否則自行合成
   return dbTotalValue.value > 0
     ? dbTotalValue.value
     : Math.max(0, itemsSubtotalValue.value + shippingFeeValue.value - discountValue.value)
@@ -417,7 +464,6 @@ onMounted(async () => {
   await loadOrder(id)
   startProgressPolling(String(id), 10000)
 
-  // 分頁隱藏暫停；回前景刷新一次後恢復輪詢
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
       stopProgressPolling()
@@ -443,64 +489,87 @@ watch(() => route.fullPath, async () => {
   startProgressPolling(String(id), 10000)
 })
 </script>
-
 <style scoped>
+/* === 色系跟靜態檔一致（柔和米色系） === */
+:root {
+  --pp-cream: #f8f2e9;
+}
+
 .thead-custom {
   background-color: burlywood;
 }
 
-/* 進度條樣式（簡易，可依你現有 CSS 覆蓋） */
+/* 抬頭卡片 */
+.order-head {
+  background: var(--pp-cream);
+  border-radius: 12px;
+}
+
+.order-head .font-monospace {
+  letter-spacing: .3px;
+}
+
+/* 進度條樣式（與靜態檔一致語意） */
 .order-progress .op-steps {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .order-progress .op-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 90px;
   text-align: center;
-  min-width: 100px;
 }
 
 .order-progress .op-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  margin: 0 auto 6px;
-  background: #ddd;
-}
-
-.order-progress .op-label {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.order-progress .op-time {
-  font-size: 12px;
-  color: #6c757d;
-  min-height: 18px;
+  background: #d0d5dd;
+  box-shadow: 0 0 0 2px #fff inset;
 }
 
 .order-progress .op-bar {
-  flex: 1 1 auto;
+  flex: 1;
   height: 4px;
-  background: #e9ecef;
-  border-radius: 2px;
+  background: #e5e7eb;
+  border-radius: 4px;
 }
 
-/* 狀態樣式 */
-.op-step.active .op-dot {
-  background: #ffc107;
+.order-progress .op-step.active .op-dot {
+  background: #ff2d55;
 }
 
-.op-step.done .op-dot {
-  background: #28a745;
+/* 目前步 */
+.order-progress .op-step.done .op-dot {
+  background: #22c55e;
 }
 
-.op-bar.active {
-  background: #ffe08a;
+/* 已完成 */
+.order-progress .op-step .op-label {
+  font-size: .9rem;
+  margin-top: 6px;
 }
 
-.op-bar.done {
-  background: #28a745;
+.order-progress .op-step .op-time {
+  font-size: .75rem;
+  color: #6b7280;
+}
+
+.order-progress .op-bar.done {
+  background: #22c55e;
+}
+
+.order-progress .op-bar.active {
+  background: linear-gradient(90deg, #22c55e 50%, #e5e7eb 50%);
+}
+
+@media (max-width:420px) {
+  .order-progress .op-step {
+    min-width: auto;
+  }
 }
 </style>

@@ -146,9 +146,9 @@
                                 <td>NT${{ fmtMoney(moneyTotalOf(o)) }}</td>
                                 <td class="td-status">
                                     <span class="badge me-1" :class="badgeCls(payStatusOf(o))">付款：{{ payStatusOf(o)
-                                        }}</span><br />
+                                    }}</span><br />
                                     <span class="badge" :class="badgeCls(deliveryStatusOf(o))">配送：{{ deliveryStatusOf(o)
-                                        }}</span>
+                                    }}</span>
                                 </td>
                                 <td class="td-delivery">{{ displayDelivery(o) }}</td>
                                 <td>{{ fmtDateTime(o.createdAt || o.date) }}</td>
@@ -182,7 +182,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-2 text-muted">訂單編號：<span class="font-mono">#{{ statusForm.orderId ?? '—'
-                                }}</span></div>
+                        }}</span></div>
                         <div class="mb-3">
                             <label class="form-label">狀態</label>
                             <select v-model="statusForm.status" class="form-select">
@@ -253,7 +253,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-2 text-muted">訂單編號：<span class="font-mono">#{{ logisticsForm.orderId ?? '—'
-                                }}</span></div>
+                        }}</span></div>
                         <div id="logisticsMeta" class="small text-muted mb-3" v-html="logisticsMetaHtml"></div>
                         <div class="row g-2">
                             <div class="col-6">
@@ -318,7 +318,6 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import * as bootstrap from 'bootstrap'
 import AdminSidebar from '@/components/AppSideBar.vue'//修正匯入路徑
 import http from '@/utils/http' //設定http
-
 
 // ===== Config =====
 const API_BASE = '/api/admin/orders'
@@ -422,7 +421,6 @@ async function fetchOrders(p = 1, s = 10, f = filters) {
     }
 }
 
-
 async function apiGet(url) {
     const { data } = await http.get(url, { headers: ADMIN_HEADERS })
     if (data.ok === false) throw new Error(data.error || '查詢失敗')
@@ -437,6 +435,8 @@ async function loadPage(p = 1) {
         orders.value = await fetchOrders(page.value, size.value, filters)
         lastRefreshed.value = new Date().toISOString()
         selected.clear()
+        // ★ 抓完列表後，強制逐筆撈新資料（避免被快取卡住）
+        await hydrateStatus(true)
     } catch (err) {
         toast(`載入失敗：${escapeHtml(err.message || '')}`, 'danger')
         orders.value = []
@@ -446,12 +446,10 @@ async function loadPage(p = 1) {
 }
 function gotoPage(p) {
     if (Number.isFinite(p) && p >= 1 && p <= totalPages.value) {
-        loadPage(p) // 這裡 loadPage 會把 page/size/filters 帶給 fetchOrders
+        loadPage(p)
     }
 }
-function onSearch() {
-    loadPage(1) // 查詢重回第 1 頁
-}
+function onSearch() { loadPage(1) }
 function onReset() {
     filters.q = ''
     filters.status = ''
@@ -460,18 +458,34 @@ function onReset() {
     filters.dateTo = ''
     loadPage(1)
 }
+
 // ===== Row / Bulk =====
 function onRowSelect(id, checked) { checked ? selected.add(id) : selected.delete(id) }
 function toggleAll(checked) { orders.value.forEach(o => checked ? selected.add(o.orderId) : selected.delete(o.orderId)) }
 function selectedIds() { return Array.from(selected.values()) }
-function openBulkMarkPaid() { if (!hasSelection.value) return; Object.assign(markPaidForm, { ids: selectedIds(), orderId: null, gateway: 'Manual', tradeNo: '', paidAmount: 0 }); markPaidModal.show() }
+function openBulkMarkPaid() {
+    if (!hasSelection.value) return
+    Object.assign(markPaidForm, { ids: selectedIds(), orderId: null, gateway: 'Manual', tradeNo: '', paidAmount: 0 })
+    markPaidModal.show()
+}
 async function bulkUpdateStatus(targetStatus) {
     const ids = selectedIds(); if (!ids.length) return
-    try { showLoading(true); await http.post(`${API_BASE}/bulk-status`, { orderIds: ids, status: targetStatus, note: '' }); toast(`已批次標記為 ${targetStatus}`); await loadPage(page.value) }
-    catch (err) { toast(`批次操作失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+    try {
+        showLoading(true)
+        await http.post(`${API_BASE}/bulk-status`, { orderIds: ids, status: targetStatus, note: '' })
+        toast(`已批次標記為 ${targetStatus}`)
+        await loadPage(page.value)
+    } catch (err) {
+        toast(`批次操作失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
-function openBulkCancel() { if (!hasSelection.value) return; Object.assign(cancelForm, { ids: selectedIds(), orderId: null, reason: '' }); cancelModal.show() }
+function openBulkCancel() {
+    if (!hasSelection.value) return
+    Object.assign(cancelForm, { ids: selectedIds(), orderId: null, reason: '' })
+    cancelModal.show()
+}
 
 // ===== Single actions =====
 function onView(id) { location.href = `orderDetail?orderId=${encodeURIComponent(id)}` }
@@ -479,9 +493,17 @@ function onOpenStatus(id, currStatus = 'Pending') { Object.assign(statusForm, { 
 function hideStatusModal() { statusModal.hide() }
 async function onSaveStatus() {
     const id = statusForm.orderId; if (!id) return
-    try { showLoading(true); await http.patch(`${API_BASE}/${id}/status`, { status: statusForm.status, note: statusForm.note || '' }); statusModal.hide(); toast('狀態已更新'); await loadPage(page.value) }
-    catch (err) { toast(`更新失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+    try {
+        showLoading(true)
+        await http.patch(`${API_BASE}/${id}/status`, { status: statusForm.status, note: statusForm.note || '' })
+        statusModal.hide()
+        toast('狀態已更新')
+        await loadPage(page.value)
+    } catch (err) {
+        toast(`更新失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 
 function onOpenMarkPaid(id, amount) { Object.assign(markPaidForm, { ids: [], orderId: id, gateway: 'Manual', tradeNo: '', paidAmount: amount || 0 }); markPaidModal.show() }
@@ -494,14 +516,23 @@ async function onMarkPaid() {
                 orderIds: markPaidForm.ids,
                 gateway: markPaidForm.gateway || 'Manual',
                 tradeNo: markPaidForm.tradeNo || '',
-                paidAmount: num(amount)
+                paidAmount: Number(markPaidForm.paidAmount || 0)
             })
         } else if (markPaidForm.orderId) {
-            await http.post(`${API_BASE}/${markPaidForm.orderId}/mark-paid`, { gateway: markPaidForm.gateway || 'Manual', tradeNo: markPaidForm.tradeNo || '', paidAmount: Number(markPaidForm.paidAmount || 0) })
+            await http.post(`${API_BASE}/${markPaidForm.orderId}/mark-paid`, {
+                gateway: markPaidForm.gateway || 'Manual',
+                tradeNo: markPaidForm.tradeNo || '',
+                paidAmount: Number(markPaidForm.paidAmount || 0)
+            })
         }
-        markPaidModal.hide(); toast('已標記為已付款'); await loadPage(page.value)
-    } catch (err) { toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+        markPaidModal.hide()
+        toast('已標記為已付款')
+        await loadPage(page.value)
+    } catch (err) {
+        toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 
 function onOpenCancel(id) { Object.assign(cancelForm, { ids: [], orderId: id, reason: '' }); cancelModal.show() }
@@ -517,8 +548,7 @@ async function onSaveCancel() {
             })
             cancelModal.hide()
             toast('已批次取消')
-        }
-        else if (cancelForm.orderId) {
+        } else if (cancelForm.orderId) {
             await http.post(`${API_BASE}/${cancelForm.orderId}/cancel`, {
                 reason: cancelForm.reason || ''
             })
@@ -526,8 +556,11 @@ async function onSaveCancel() {
             toast('訂單已取消')
         }
         await loadPage(page.value)
-    } catch (err) { toast(`取消失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+    } catch (err) {
+        toast(`取消失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 
 // ===== Logistics =====
@@ -539,7 +572,7 @@ async function onOpenLogistics(id) {
     logisticsMetaHtml.value = '讀取中…'
     try {
         showLoading(true)
-        const o = await fetchOrderOne(id); logisticsForm._order = o
+        const o = await fetchOrderOne(id, { force: true }); logisticsForm._order = o
         if (o.logisticsId) logisticsForm.logisticsId = o.logisticsId
         if (o.trackingNo) logisticsForm.trackingNo = o.trackingNo
         const t = String(o.shippingType || '').toLowerCase(); logisticsForm._shipType = t
@@ -547,38 +580,54 @@ async function onOpenLogistics(id) {
         if (t === 'address') {
             logisticsMetaHtml.value = `<div><span class="badge bg-secondary">宅配</span> ${escapeHtml(o.addr || '')}</div><div class="text-muted">收件人：${escapeHtml(o.receiverName || '—')}（${escapeHtml(o.receiverPhone || '—')}）</div>`
             Object.assign(logisticsFooter, {
-                showCreate: true, createText: '建立宅配託運單', onCreate: () => createHomeFor(id), showQuery: true, queryText: '查詢宅配狀態', onQuery: async () => {
+                showCreate: true, createText: '建立宅配託運單', onCreate: () => createHomeFor(id),
+                showQuery: true, queryText: '查詢宅配狀態', onQuery: async () => {
                     try {
-                        showLoading(true); const j = await queryTrackingFromEcpay(id); if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
-                        const o2 = await fetchOrderOne(id); if (o2.trackingNo) { logisticsForm.trackingNo = o2.trackingNo; toast(`已取得追蹤碼：${escapeHtml(o2.trackingNo)}`) } else { toast('目前仍未提供追蹤碼，稍後可再試一次。', 'secondary') }
+                        showLoading(true)
+                        const j = await queryTrackingFromEcpay(id)
+                        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId
+                        if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
+                        const o2 = await fetchOrderOne(id, { force: true })
+                        if (o2.trackingNo) { logisticsForm.trackingNo = o2.trackingNo; toast(`已取得追蹤碼：${escapeHtml(o2.trackingNo)}`) }
+                        else { toast('目前仍未提供追蹤碼，稍後可再試一次。', 'secondary') }
                         if (o2.trackingNo && !['CANCELLED', 'FAILED', 'DELIVERED'].includes(String(o2.status || '').toUpperCase())) {
-                            await http.patch(`${API_BASE}/${id}/status`, {
-                                status: 'Shipped',
-                                note: 'Admin 查詢物流取得追蹤碼，自動轉已出貨'
-                            })
+                            await http.patch(`${API_BASE}/${id}/status`, { status: 'Shipped', note: 'Admin 查詢物流取得追蹤碼，自動轉已出貨' })
                         }
-                        try { await hydrateStatus() } catch { }
-                    } catch (err) { toast(`查詢失敗：${escapeHtml(err.message || '')}`, 'danger') } finally { showLoading(false) }
+                        try { await hydrateStatus(true) } catch { }
+                    } catch (err) {
+                        toast(`查詢失敗：${escapeHtml(err.message || '')}`, 'danger')
+                    } finally { showLoading(false) }
                 }
             })
         } else if (t === 'cvs_cod') {
             const brand = o.storeBrand || '全家', brandText = brand ? `（${escapeHtml(brand)}）` : ''
             logisticsMetaHtml.value = `<div><span class="badge bg-info text-dark">超商取貨付款</span> ${brandText}</div><div class="text-muted">${escapeHtml(o.storeName || '—')}　${o.storeAddress ? '｜' + escapeHtml(o.storeAddress) : ''}</div>`
             Object.assign(logisticsFooter, {
-                showCreate: true, createText: '建立超商託運單（全家B2C）', onCreate: () => createCvsForB2C(id), showQuery: true, queryText: '查詢超商狀態', onQuery: async () => {
+                showCreate: true, createText: '建立超商託運單（全家B2C）', onCreate: () => createCvsForB2C(id),
+                showQuery: true, queryText: '查詢超商狀態', onQuery: async () => {
                     try {
-                        showLoading(true); const j = await queryCvsFromEcpay(id); if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
-                        const o2 = await fetchOrderOne(id); if (o2.trackingNo) { logisticsForm.trackingNo = o2.trackingNo; toast(`已取得追蹤碼：${escapeHtml(o2.trackingNo)}`) } else { toast('目前仍未提供追蹤碼，稍後可再試一次。', 'secondary') }
-                        try { await hydrateStatus() } catch { }
-                    } catch (err) { toast(`查詢失敗：${escapeHtml(err.message || '')}`, 'danger') } finally { showLoading(false) }
+                        showLoading(true)
+                        const j = await queryCvsFromEcpay(id)
+                        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId
+                        if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
+                        const o2 = await fetchOrderOne(id, { force: true })
+                        if (o2.trackingNo) { logisticsForm.trackingNo = o2.trackingNo; toast(`已取得追蹤碼：${escapeHtml(o2.trackingNo)}`) }
+                        else { toast('目前仍未提供追蹤碼，稍後可再試一次。', 'secondary') }
+                        try { await hydrateStatus(true) } catch { }
+                    } catch (err) {
+                        toast(`查詢失敗：${escapeHtml(err.message || '')}`, 'danger')
+                    } finally { showLoading(false) }
                 }
             })
         } else {
             logisticsMetaHtml.value = `<div class="text-muted">配送：${escapeHtml(o.shippingType || '—')}</div>`
         }
         logisticsModal.show()
-    } catch (err) { toast(`讀取訂單失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+    } catch (err) {
+        toast(`讀取訂單失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 function hideLogisticsModal() { logisticsModal.hide() }
 
@@ -612,7 +661,7 @@ async function onSaveLogistics() {
         }
 
         logisticsModal.hide()
-        toast('物流資訊已儲存（狀態已切換為已出貨）')
+        toast('物流資訊已儲存')
         await loadPage(page.value)
     } catch (err) {
         toast(`操作失敗：${escapeHtml(err.message || '')}`, 'danger')
@@ -620,6 +669,7 @@ async function onSaveLogistics() {
         showLoading(false)
     }
 }
+
 // Logistics APIs
 async function queryTrackingFromEcpay(orderId) {
     const { data } = await http.get(`/api/logistics/home/query/${encodeURIComponent(orderId)}`, { headers: ADMIN_HEADERS })
@@ -634,22 +684,34 @@ async function createHomeFor(orderId) {
     if (!orderId) return
     try {
         showLoading(true)
-        const base = await fetchOrderOne(orderId); const isCod = resolvePayMethod(base) === 'COD'
+        const base = await fetchOrderOne(orderId, { force: true }); const isCod = resolvePayMethod(base) === 'COD'
         const { data: j } = await http.post(
             '/api/logistics/home/ecpay/create',
             { orderId, isCod }, // body
             { headers: ADMIN_HEADERS }
         )
         if (j.ok === false) throw new Error(j.error || '建立失敗')
-        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
-        const payload = {}; if (j.logisticsId) payload.logisticsId = j.logisticsId; if (j.trackingNo) payload.trackingNo = j.trackingNo
+        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId
+        if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
+        const payload = {}
+        if (j.logisticsId) payload.logisticsId = j.logisticsId
+        if (j.trackingNo) payload.trackingNo = j.trackingNo
         if (Object.keys(payload).length) await http.post(`${API_BASE}/${orderId}/logistics`, payload)
-        if (j.trackingNo) { toast(`宅配託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`); } else { toast('宅配託運單建立完成，追蹤碼尚未提供（將於回拋或查詢後自動更新）', 'warning'); await pollTracking(orderId, 6, 5000); }
-        try { await hydrateStatus() } catch { }
+        if (j.trackingNo) {
+            toast(`宅配託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`)
+        } else {
+            toast('宅配託運單建立完成，追蹤碼尚未提供（將於回拋或查詢後自動更新）', 'warning')
+            await pollTracking(orderId, 6, 5000)
+        }
+        try { await hydrateStatus(true) } catch { }
         await http.patch(`${API_BASE}/${orderId}/status`, { status: 'Shipped', note: 'Admin 建立綠界宅配' })
-        orderCache.delete(Number(orderId)); await loadPage(page.value)
-    } catch (err) { toast(`宅配建立失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+        orderCache.delete(Number(orderId))
+        await loadPage(page.value)
+    } catch (err) {
+        toast(`宅配建立失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 
 async function createCvsForB2C(orderId) {
@@ -663,52 +725,80 @@ async function createCvsForB2C(orderId) {
         )
         if (j.ok === false) throw new Error(j.error || '建立失敗')
 
-        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId; if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
-        const payload = {}; if (j.logisticsId) payload.logisticsId = j.logisticsId; if (j.trackingNo) payload.trackingNo = j.trackingNo
-        if (j.cvsPaymentNo) payload.cvsPaymentNo = j.cvsPaymentNo; if (j.cvsValidationNo) payload.cvsValidationNo = j.cvsValidationNo
+        if (j.logisticsId) logisticsForm.logisticsId = j.logisticsId
+        if (j.trackingNo) logisticsForm.trackingNo = j.trackingNo
+        const payload = {}
+        if (j.logisticsId) payload.logisticsId = j.logisticsId
+        if (j.trackingNo) payload.trackingNo = j.trackingNo
+        if (j.cvsPaymentNo) payload.cvsPaymentNo = j.cvsPaymentNo
+        if (j.cvsValidationNo) payload.cvsValidationNo = j.cvsValidationNo
         if (Object.keys(payload).length) await http.post(`${API_BASE}/${orderId}/logistics`, payload)
+
         if (j.trackingNo) {
-            toast(`超商託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`);
+            toast(`超商託運單建立完成，追蹤碼：${escapeHtml(j.trackingNo)}`)
         } else if (j.logisticsId) {
-            toast(`超商託運單建立完成（LogisticsID：${escapeHtml(j.logisticsId)}）`);
+            toast(`超商託運單建立完成（LogisticsID：${escapeHtml(j.logisticsId)}）`)
         } else {
-            toast('超商託運單建立完成（追蹤碼將於回拋或查詢後更新）', 'warning');
+            toast('超商託運單建立完成（追蹤碼將於回拋或查詢後更新）', 'warning')
         }
-        try { await hydrateStatus() } catch { }
+        try { await hydrateStatus(true) } catch { }
         await http.patch(`${API_BASE}/${orderId}/status`, { status: 'Shipped', note: 'Admin 建立綠界超商B2C（全家）' })
-        orderCache.delete(Number(orderId)); await loadPage(page.value)
-    } catch (err) { toast(`超商託運單建立失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+        orderCache.delete(Number(orderId))
+        await loadPage(page.value)
+    } catch (err) {
+        toast(`超商託運單建立失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 
 async function pollTracking(orderId, times = 3, intervalMs = 5000) {
     for (let i = 0; i < times; i++) {
         try {
-            await wait(intervalMs); await queryTrackingFromEcpay(orderId); const o = await fetchOrderOne(orderId)
-            if (o && o.trackingNo) { logisticsForm.trackingNo = o.trackingNo; toast(`已取得追蹤碼：${escapeHtml(o.trackingNo)}`); return }
+            await wait(intervalMs)
+            await queryTrackingFromEcpay(orderId)
+            const o = await fetchOrderOne(orderId, { force: true })
+            if (o && o.trackingNo) {
+                logisticsForm.trackingNo = o.trackingNo
+                toast(`已取得追蹤碼：${escapeHtml(o.trackingNo)}`)
+                return
+            }
         } catch { }
     }
     toast('仍未收到追蹤碼（可能綠界稍後回拋）', 'secondary')
 }
 
 // ===== Hydrate =====
-async function hydrateStatus() {
-    for (const row of orders.value) {
+async function hydrateStatus(force = false) {
+    await Promise.all(orders.value.map(async (row) => {
         try {
-            const o = await fetchOrderOne(row.orderId)
-            const pay = payStatusOf(o); if (pay === '已付款' || pay.startsWith('已付款')) lastPaid.add(row.orderId)
+            const o = await fetchOrderOne(row.orderId, { force })
+            // ★ 若是 COD 且已配達/已取件，順手把它加入 lastPaid，避免其他地方依賴 lastPaid 判斷時跑掉
+            const ls = getLogisticsStatus(o)
+            const delivered =
+                String(o.status || '').toUpperCase() === 'DELIVERED' ||
+                !!o.deliveredAt || !!o.receivedAt ||
+                ['DELIVERED', 'PICKED_UP', 'RECEIVED', 'DONE'].includes(ls)
+            if (resolvePayMethod(o) === 'COD' && delivered) {
+                lastPaid.add(row.orderId)
+            }
+
+            const pay = payStatusOf(o)
+            if (pay === '已付款' || pay.startsWith('已付款')) lastPaid.add(row.orderId)
             Object.assign(row, o)
         } catch { }
-    }
+    }))
 }
-async function hydrateDelivery() { for (const row of orders.value) { try { Object.assign(row, await fetchOrderOne(row.orderId)) } catch { } } }
+async function hydrateDelivery() { for (const row of orders.value) { try { Object.assign(row, await fetchOrderOne(row.orderId, { force: true })) } catch { } } }
 
-async function fetchOrderOne(id) {
+async function fetchOrderOne(id, { force = false } = {}) {
     id = Number(id)
-    if (orderCache.has(id)) return orderCache.get(id)
-
+    if (!force && orderCache.has(id)) return orderCache.get(id)
     try {
-        const { data } = await http.get(`${API_BASE}/${id}`, { headers: ADMIN_HEADERS })
+        const { data } = await http.get(`${API_BASE}/${id}`, {
+            headers: ADMIN_HEADERS,
+            params: { _t: Date.now() } // cache-busting
+        })
         orderCache.set(id, data)
         return data
     } catch (err) {
@@ -722,22 +812,34 @@ async function exportCSV() {
     try {
         showLoading(true)
         const rows = [], backupSize = size.value, backupPage = page.value
-        size.value = 100; await loadPage(1); rows.push(...collectRows())
-        for (let p = 2; p <= totalPages.value; p++) { page.value = p; orders.value = await fetchOrders(); rows.push(...collectRows()) }
-        size.value = backupSize; page.value = backupPage; await loadPage(page.value)
+        size.value = 100
+        await loadPage(1)
+        rows.push(...collectRows())
+        for (let p = 2; p <= totalPages.value; p++) {
+            page.value = p
+            orders.value = await fetchOrders()
+            rows.push(...collectRows())
+        }
+        size.value = backupSize
+        page.value = backupPage
+        await loadPage(page.value)
         const head = ['訂單編號', '綠界訂單編號', '會員', '金額', '狀態', '配送', '下單時間']
         const csv = [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n')
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
         const url = URL.createObjectURL(blob); const a = document.createElement('a')
-        a.href = url; a.download = `orders_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url); toast('CSV 匯出完成')
-    } catch (err) { toast(`匯出失敗：${escapeHtml(err.message || '')}`, 'danger') }
-    finally { showLoading(false) }
+        a.href = url; a.download = `orders_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url)
+        toast('CSV 匯出完成')
+    } catch (err) {
+        toast(`匯出失敗：${escapeHtml(err.message || '')}`, 'danger')
+    } finally {
+        showLoading(false)
+    }
 }
 function collectRows() {
     return ordersSorted.value.map(o => {
         const id = `#${o.orderId}`, mtn = (o.merchantTradeNo || '').trim()
         const member = (o.receiverName || o.userName || (o.userId != null ? `#${o.userId}` : '—')).toString()
-        const amount = `NT$${fmtMoney(moneyTotalOf(o))}`        
+        const amount = `NT$${fmtMoney(moneyTotalOf(o))}`
         const status = `付款：${payStatusOf(o)} 配送：${deliveryStatusOf(o)}`, delivery = displayDelivery(o), time = fmtDateTime(o.createdAt || o.date)
         return [id.replace(/^#/, ''), mtn, member, amount.replace(/^NT\$/, ''), status, delivery, time]
     })
@@ -745,9 +847,9 @@ function collectRows() {
 
 // ===== Utils =====
 function showLoading(isLoading) {
-    // TODO: 放 loading 動畫控制
     console.log(isLoading ? '載入中...' : '載入完成')
-} function toast(message, type = 'success') {
+}
+function toast(message, type = 'success') {
     const id = 't' + Math.random().toString(36).slice(2)
     const html = `<div id="${id}" class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="d-flex"><div class="toast-body">${message}</div>
@@ -767,7 +869,8 @@ function displayDelivery(o) {
         const brand = o.storeBrand || '', name = o.storeName || '', addr = o.storeAddress || '', parts = [brand, name].filter(Boolean).join(' ')
         return parts || addr ? `${parts ? parts : ''}${addr ? (parts ? ' ' : '') + `（${addr}）` : ''}` : '超商取貨付款'
     }
-    if (type === 'address' || o.addr) return o.addr ? `宅配（${o.addr}）` : '宅配'; return '—'
+    if (type === 'address' || o.addr) return o.addr ? `宅配（${o.addr}）` : '宅配'
+    return '—'
 }
 function badgeCls(label) {
     const k = (label || '').toLowerCase()
@@ -779,53 +882,134 @@ function badgeCls(label) {
     if (k === '付款失敗') return 'bg-danger'
     return 'bg-light text-dark'
 }
+
+// ★ 旗標正規化：true/'Y'/'1' 都當真
+function isTruthyFlag(v) {
+    if (v == null) return false
+    if (typeof v === 'boolean') return v
+    if (typeof v === 'number') return v === 1
+    const s = String(v).trim().toLowerCase()
+    return /^(true|1|y|yes|t|cod)$/i.test(s)
+}
+
+// ★ 更完整的物流狀態同義字（移除 ARRIVAL/ARRIVED → DELIVERED 的映射）
 function getLogisticsStatus(o) {
     let raw = o.logisticsStatus ?? o.logisticStatus ?? o.ecpayLogisticsStatus ?? o.shippingStatus ?? o.shipping_state ?? o.shipStatus ?? ''
-    if (!raw) return ''; let s = String(raw).trim().replace(/[\s-]+/g, '_').toUpperCase().replace(/[^A-Z_]/g, '')
+    if (!raw) raw = ''
+    let s = String(raw).trim().replace(/[\s-]+/g, '_').toUpperCase().replace(/[^A-Z_]/g, '')
     const map = {
-        INTRANSIT: 'IN_TRANSIT', OUT_FOR_DELIVERY: 'IN_TRANSIT', DELIVERING: 'IN_TRANSIT', SHIPPING: 'IN_TRANSIT', SENT: 'IN_TRANSIT', DISPATCHED: 'IN_TRANSIT',
-        LABEL_CREATED: 'CREATED', READY_TO_SHIP: 'CREATED', ACCEPTED: 'CREATED', PRINTED: 'CREATED', ARRIVED: 'DELIVERED', RECEIVED: 'DELIVERED', DELIVERY_DONE: 'DELIVERED', DONE: 'DELIVERED'
+        INTRANSIT: 'IN_TRANSIT', IN_TRANSIT: 'IN_TRANSIT', OUT_FOR_DELIVERY: 'IN_TRANSIT',
+        DELIVERING: 'IN_TRANSIT', SHIPPING: 'IN_TRANSIT', SENT: 'IN_TRANSIT', DISPATCHED: 'IN_TRANSIT',
+        LABEL_CREATED: 'CREATED', READY_TO_SHIP: 'CREATED', ACCEPTED: 'CREATED', PRINTED: 'CREATED',
+        // 不把 ARRIVAL / ARRIVED 當 DELIVERED
+        RECEIVED: 'DELIVERED', SIGNED: 'DELIVERED',
+        SIGNED_FOR: 'DELIVERED', DELIVERY_DONE: 'DELIVERED', DELIVERED_SUCCESS: 'DELIVERED',
+        SUCCESS: 'DELIVERED', COMPLETE: 'DELIVERED', COMPLETED: 'DELIVERED', DONE: 'DELIVERED',
+        PICKUP_COMPLETE: 'PICKED_UP', PICKEDUP: 'PICKED_UP', PICKED_UP: 'PICKED_UP'
     }
-    return map[s] || s
+    let v = map[s] || s
+    // fallback：沒有顯式狀態時用時間欄位推論
+    if (!v || v === 'NULL' || v === '') {
+        if (o.deliveredAt || o.receivedAt) return 'DELIVERED'
+        if (o.shippedAt) return 'IN_TRANSIT'
+    }
+    return v
 }
 function consignmentCreated(o) { const ls = getLogisticsStatus(o); return Boolean(o.logisticsId || o.trackingNo || ls) }
-function resolvePayMethod(o) {
-    const candidates = [o.paymentMethod, o.payment_method, o.payment, o.payMethod, o.pay_type, o.paymentType, o.payment_type, o.gateway, o.paymentGateway, o.method]
-    const s = candidates.map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean).join('|')
-    if (/credit|card|信用卡/.test(s)) return 'CREDIT'
-    if (/cod|貨到|cvs_cod|collection/.test(s)) return 'COD'
-    if (o.isCollection === true || o.collection === true) return 'COD'
-    if (Number(o.collectionAmount || 0) > 0) return 'COD'
-    const shipType = String(o.shippingType || '').trim().toLowerCase(); if (shipType === 'cvs_cod') return 'COD'; return 'CREDIT'
+
+// ★ 嚴格版「已配達」判斷（簽收/完成，刻意不含 ARRIVED/到站）
+function isDeliveredStrict(o) {
+    const s  = String(o.status || '').toUpperCase()
+    const ls = getLogisticsStatus(o)
+    if (o.deliveredAt || o.receivedAt || s === 'DELIVERED') return true
+    return ['DELIVERED','SIGNED','SIGNED_FOR','DELIVERY_DONE','RECEIVED','DONE','COMPLETED','COMPLETE','DELIVERED_SUCCESS','PICKED_UP'].includes(ls)
 }
+
+// ★ 更完整的 COD 辨識
+function resolvePayMethod(o) {
+    const shipType = String(o.shippingType || '').trim().toLowerCase()
+
+    // 1) 布林/數值旗標
+    const codFlags = [
+        o.isCod, o.is_cod, o.cod, o.cod_flag,
+        o.cashOnDelivery, o.cash_on_delivery,
+        o.is_collection, o.isCollection, o.collection,
+        o.payOnDelivery, o.pay_on_delivery,
+        o.collectOnDelivery, o.collect_on_delivery
+    ]
+    if (codFlags.some(isTruthyFlag)) return 'COD'
+    if (Number(o.collectionAmount || o.codAmount || o.cod_amount || 0) > 0) return 'COD'
+    if (shipType === 'cvs_cod') return 'COD'
+
+    // 2) 文字欄位
+    const text = [
+        o.paymentMethod, o.payment_method, o.payment, o.payMethod, o.pay_type,
+        o.paymentType, o.payment_type, o.gateway, o.paymentGateway, o.method,
+        o.paymentTerm, o.payment_terms, o.paymentDesc, o.payment_desc, o.pay_desc
+    ].map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean).join('|')
+
+    if (/(cod|貨到|貨到付款|到貨付款|取貨付款|到付|到站付|收件付款|cash on delivery|cash_on_delivery|collect on delivery|collect_on_delivery|cvs_cod)/.test(text)) {
+        return 'COD'
+    }
+    // 在宅配/超商情境下，method=Cash/現金 也視為 COD
+    if ((/(\bcash\b|現金)/.test(text)) && (shipType === 'address' || shipType === 'cvs_cod')) {
+        return 'COD'
+    }
+
+    if (/credit|card|信用卡/.test(text)) return 'CREDIT'
+    return 'CREDIT'
+}
+
+// ★ 付款狀態：宅配 COD 只在嚴格已配達時顯示「已付款（COD）」
 function payStatusOf(o) {
-    const s = String(o.status || '').trim().toUpperCase(), shipType = String(o.shippingType || '').trim().toLowerCase(), logi = getLogisticsStatus(o)
-    if (s === 'FAILED') return '付款失敗'; if (s === 'CANCELLED') return '已取消'
+    const s = String(o.status || '').trim().toUpperCase()
+    const shipType = String(o.shippingType || '').trim().toLowerCase()
+    const ls = getLogisticsStatus(o)
+
+    if (s === 'FAILED') return '付款失敗'
+    if (s === 'CANCELLED') return '已取消'
+
     const method = resolvePayMethod(o)
-    if (method === 'COD') { if (shipType === 'cvs_cod' || shipType === 'address') { if (logi === 'DELIVERED') return '已付款（COD）'; return '待付款' } return '待付款' }
+    if (method === 'COD') {
+        if (shipType === 'address') {
+            return isDeliveredStrict(o) ? '已付款（COD）' : '待付款'
+        }
+        if (shipType === 'cvs_cod') {
+            return ['PICKED_UP','RECEIVED','DELIVERED','DONE'].includes(ls) ? '已付款（COD）' : '待付款'
+        }
+        return isDeliveredStrict(o) ? '已付款（COD）' : '待付款'
+    }
+
+    // 非 COD：維持原本規則
     const paidAmount = Number(o.paidAmount ?? o.totalPaid ?? 0)
     if (s === 'PAID' || o.paidAt || paidAmount > 0) return '已付款'
     if (Boolean(o.merchantTradeNo)) return '已付款'
     if (shipType !== 'cvs_cod' && lastPaid.has(Number(o.orderId))) return '已付款'
     return '待付款'
 }
+
 function deliveryStatusOf(o) {
-    const orderS = String(o.status || '').toUpperCase(); if (orderS === 'FAILED' || orderS === 'CANCELLED') return '—'
+    const orderS = String(o.status || '').toUpperCase()
+    if (orderS === 'FAILED' || orderS === 'CANCELLED') return '—'
+    // ★ 若訂單狀態是 Delivered 或有 deliveredAt，就直接視為已配達
+    if (orderS === 'DELIVERED' || o.deliveredAt || o.receivedAt) return '已配達'
+
     const shipType = String(o.shippingType || '').trim().toLowerCase(), ls = getLogisticsStatus(o)
     if (ls === 'DELIVERED' || ls === 'PICKED_UP' || ls === 'RECEIVED' || ls === 'DONE') return '已配達'
     if (shipType === 'address') return (orderS === 'SHIPPED' || ls === 'IN_TRANSIT') ? '已出貨' : '待出貨'
-    if (shipType === 'cvs_cod') { if (FLAGS.SHIPPED_ON_CONSIGNMENT && consignmentCreated(o)) return '已出貨'; return (orderS === 'SHIPPED' || ls === 'IN_TRANSIT') ? '已出貨' : '待出貨' }
+    if (shipType === 'cvs_cod') {
+        if (FLAGS.SHIPPED_ON_CONSIGNMENT && consignmentCreated(o)) return '已出貨'
+        return (orderS === 'SHIPPED' || ls === 'IN_TRANSIT') ? '已出貨' : '待出貨'
+    }
     if (shipType) return (orderS === 'SHIPPED' || ls === 'IN_TRANSIT' || (FLAGS.SHIPPED_ON_CONSIGNMENT && consignmentCreated(o))) ? '已出貨' : '待出貨'
     return '—'
 }
+
 function csvCell(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 function escapeHtml(s) { return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;') }
 async function safeText(r) { try { return await r.text() } catch { return `HTTP ${r.status}` } }
 function wait(ms) { return new Promise(res => setTimeout(res, ms)) }
-function num(x) {
-    const n = Number(x)
-    return Number.isFinite(n) ? n : 0
-}
+function num(x) { const n = Number(x); return Number.isFinite(n) ? n : 0 }
 
 function moneyTotalOf(o) {
     // 1) 先用後端可能已含運的欄位
@@ -839,11 +1023,7 @@ function moneyTotalOf(o) {
     const disc = num(o.discount ?? o.discountAmount ?? o.couponDiscount)
     return items + ship - disc
 }
-
-function fmtMoney(n) {
-    return num(n).toLocaleString('zh-Hant-TW')
-}
-
+function fmtMoney(n) { return num(n).toLocaleString('zh-Hant-TW') }
 </script>
 
 <style scoped>

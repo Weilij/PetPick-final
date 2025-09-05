@@ -517,9 +517,9 @@ function showToast(message, type = 'success') {
     right: 20px; 
     z-index: 2000; 
     min-width: 300px;
-    background-color: white;
-    border: solid 1.5px green;
     text-align: center;
+    background: #22c55e;
+    color: white;
     animation: slideIn 0.3s ease-out;
   `
   toast.innerHTML = `

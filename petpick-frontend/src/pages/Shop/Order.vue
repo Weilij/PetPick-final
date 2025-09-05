@@ -30,8 +30,10 @@
               <td>{{ fmtDateTime(o.createdAt) }}</td>
               <td>NT$ {{ toTW(o.totalPrice) }}</td>
               <td>
-                <!-- 狀態徽章保留原本色系（Bootstrap） -->
-                <span class="badge ppk-badge" :class="statusBadgeClass(o.status)">{{ o.status }}</span>
+                <!-- 統一用運送/付款規則推導顯示文字與顏色（含 COD 已配達＝已付款（COD）） -->
+                <span class="badge ppk-badge" :class="statusBadgeClassByText(orderStatusText(o))">
+                  {{ orderStatusText(o) }}
+                </span>
               </td>
               <td>
                 <RouterLink class="btn btn-sm ppk-btn"
@@ -42,7 +44,9 @@
                 <!-- 可取消：白話提示，使用 BS Tooltip -->
                 <button v-if="canCancel(o.status, o.logisticsStatus)" class="btn btn-sm ppk-btn-danger cancel-btn"
                   :data-id="oKey(o)" :data-mtn="(o.merchantTradeNo ?? o.mtn) || ''" data-bs-toggle="tooltip"
-                  data-bs-placement="top" title="點擊以取消此訂單" @click="openCancel(o)">取消訂單</button>
+                  data-bs-placement="top" title="點擊以取消此訂單" @click="openCancel(o)">
+                  取消訂單
+                </button>
 
                 <!-- 不可取消（外層 span 套 tooltip，因 disabled 按鈕吃不到事件） -->
                 <span v-else class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
@@ -155,19 +159,7 @@ function fmtDateTime(iso) {
   return `${y}-${m}-${day} ${hh}:${mm}`
 }
 
-// 狀態徽章（保留原本 Bootstrap 色系）
-function statusBadgeClass(s) {
-  const k = String(s || '').toLowerCase()
-  if (['paid', '已付款'].includes(k)) return 'bg-success'
-  if (['pending', '待付款'].includes(k)) return 'bg-warning text-dark'
-  if (['shipped', '已出貨'].includes(k)) return 'bg-info text-dark'
-  if (['delivered', '已配達'].includes(k)) return 'bg-primary'
-  if (['cancelled', '取消'].includes(k)) return 'bg-secondary'
-  if (['failed', '失敗'].includes(k)) return 'bg-dark'
-  return 'bg-light text-dark'
-}
-
-// 是否可取消
+// ====== 取消邏輯 ======
 function canCancel(status, logisticsStatus) {
   const s = String(status || '').toUpperCase()
   const l = String(logisticsStatus || '').toUpperCase()
@@ -175,8 +167,6 @@ function canCancel(status, logisticsStatus) {
   if (['IN_TRANSIT', 'DELIVERED', 'PICKED_UP'].includes(l)) return false
   return true
 }
-
-// 只給按鈕提示詞（狀態不掛 tooltip）
 function cancelTooltip(status, logisticsStatus) {
   const s = String(status || '').toUpperCase()
   const l = String(logisticsStatus || '').toUpperCase()
@@ -268,6 +258,116 @@ onMounted(async () => {
   await refreshBadge()
 })
 onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+
+// ===================== 新增：狀態顯示統一（含 COD 情境） =====================
+
+// 旗標正規化：true/'Y'/'1' 都當真
+function isTruthyFlag(v) {
+  if (v == null) return false
+  if (typeof v === 'boolean') return v
+  if (typeof v === 'number') return v === 1
+  const s = String(v).trim().toLowerCase()
+  return /^(true|1|y|yes|t|cod)$/i.test(s)
+}
+
+// 物流狀態同義字整理 + 時間欄位回退推論
+function getLogisticsStatus(o) {
+  let raw = o.logisticsStatus ?? o.shippingStatus ?? o.shipStatus ?? ''
+  let s = String(raw).trim().replace(/[\s-]+/g, '_').toUpperCase().replace(/[^A-Z_]/g, '')
+  const map = {
+    INTRANSIT: 'IN_TRANSIT', IN_TRANSIT: 'IN_TRANSIT', OUT_FOR_DELIVERY: 'IN_TRANSIT',
+    DELIVERING: 'IN_TRANSIT', SHIPPING: 'IN_TRANSIT', SENT: 'IN_TRANSIT', DISPATCHED: 'IN_TRANSIT',
+    LABEL_CREATED: 'CREATED', READY_TO_SHIP: 'CREATED', ACCEPTED: 'CREATED', PRINTED: 'CREATED',
+    ARRIVAL: 'DELIVERED', ARRIVED: 'DELIVERED', RECEIVED: 'DELIVERED', SIGNED: 'DELIVERED',
+    SIGNED_FOR: 'DELIVERED', DELIVERY_DONE: 'DELIVERED', DELIVERED_SUCCESS: 'DELIVERED',
+    SUCCESS: 'DELIVERED', COMPLETE: 'DELIVERED', COMPLETED: 'DELIVERED', DONE: 'DELIVERED',
+    PICKUP_COMPLETE: 'PICKED_UP', PICKEDUP: 'PICKED_UP', PICKED_UP: 'PICKED_UP'
+  }
+  let v = map[s] || s
+  if (!v || v === 'NULL' || v === '') {
+    if (o.deliveredAt || o.receivedAt) return 'DELIVERED'
+    if (o.shippedAt) return 'IN_TRANSIT'
+  }
+  return v
+}
+
+// COD 辨識（布林旗標 / 數值欄位 / 文字欄位 / 配送型態）
+function resolvePayMethod(o) {
+  const shipType = String(o.shippingType || '').trim().toLowerCase()
+
+  // 布林/數值旗標
+  const codFlags = [
+    o.isCod, o.is_cod, o.cod, o.cod_flag,
+    o.cashOnDelivery, o.cash_on_delivery,
+    o.is_collection, o.isCollection, o.collection,
+    o.payOnDelivery, o.pay_on_delivery,
+    o.collectOnDelivery, o.collect_on_delivery
+  ]
+  if (codFlags.some(isTruthyFlag)) return 'COD'
+  if (Number(o.collectionAmount || o.codAmount || o.cod_amount || 0) > 0) return 'COD'
+  if (shipType === 'cvs_cod') return 'COD'
+
+  // 文字欄位
+  const text = [
+    o.paymentMethod, o.payment_method, o.payment, o.payMethod, o.pay_type,
+    o.paymentType, o.payment_type, o.gateway, o.paymentGateway, o.method,
+    o.paymentTerm, o.payment_terms, o.paymentDesc, o.payment_desc, o.pay_desc
+  ].map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean).join('|')
+
+  if (/(cod|貨到|貨到付款|到貨付款|取貨付款|到付|到站付|收件付款|cash on delivery|cash_on_delivery|collect on delivery|collect_on_delivery|cvs_cod)/.test(text)) {
+    return 'COD'
+  }
+  if ((/(\bcash\b|現金)/.test(text)) && (shipType === 'address' || shipType === 'cvs_cod')) {
+    return 'COD'
+  }
+
+  if (/credit|card|信用卡/.test(text)) return 'CREDIT'
+  return 'CREDIT'
+}
+
+// 是否具「已完成收貨」跡象（訂單狀態/物流狀態/時間欄）
+function deliveredLike(o) {
+  const s = String(o.status || '').toUpperCase()
+  const ls = getLogisticsStatus(o)
+  return s === 'DELIVERED' ||
+    !!o.deliveredAt || !!o.receivedAt ||
+    ['DELIVERED', 'PICKED_UP', 'RECEIVED', 'DONE'].includes(ls)
+}
+
+// 顯示文字（以付款邏輯合併 COD）
+function orderStatusText(o) {
+  const s = String(o.status || '').toUpperCase()
+
+  if (s === 'CANCELLED') return '取消'
+  if (s === 'FAILED') return '失敗'
+
+  // COD：只要已配達/取件完成 → 視為「已付款（COD）」
+  if (resolvePayMethod(o) === 'COD' && deliveredLike(o)) return '已付款（COD）'
+
+  // 一般線上付款
+  if (s === 'PAID' || o.paidAt || Number(o.paidAmount ?? 0) > 0) return '已付款'
+
+  // 配送進度
+  if (s === 'DELIVERED' || deliveredLike(o)) return '已配達'
+  const ls = getLogisticsStatus(o)
+  if (s === 'SHIPPED' || ls === 'IN_TRANSIT') return '已出貨'
+
+  // 下單未付
+  if (s === 'PENDING') return '待付款'
+
+  return '處理中'
+}
+
+// 依顯示文字決定 Badge 類別（Bootstrap）
+function statusBadgeClassByText(t) {
+  if (t.startsWith('已付款')) return 'bg-success'
+  if (t === '已配達') return 'bg-primary'
+  if (t === '已出貨') return 'bg-info text-dark'
+  if (t === '待付款') return 'bg-warning text-dark'
+  if (t === '取消') return 'bg-secondary'
+  if (t.includes('失敗')) return 'bg-dark'
+  return 'bg-light text-dark'
+}
 </script>
 
 <style scoped>

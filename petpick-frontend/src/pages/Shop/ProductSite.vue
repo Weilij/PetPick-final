@@ -16,17 +16,9 @@
         <div class="bg-white rounded-3 shadow-sm p-3">
           <img id="mainImg" class="img-fluid rounded" :src="state.mainImg" :alt="state.displayName" />
           <div id="thumbs" class="d-flex gap-2 mt-3 flex-wrap">
-            <img
-              v-for="(url, i) in thumbs"
-              :key="i"
-              :src="url"
-              :alt="`${state.displayName} 縮圖`"
-              width="72" height="72"
-              class="thumb rounded"
-              :class="{ active: state.mainImg === url }"
-              style="cursor:pointer;object-fit:cover"
-              @click="state.mainImg = url"
-            />
+            <img v-for="(url, i) in thumbs" :key="i" :src="url" :alt="`${state.displayName} 縮圖`" width="72" height="72"
+              class="thumb rounded" :class="{ active: state.mainImg === url }" style="cursor:pointer;object-fit:cover"
+              @click="state.mainImg = url" />
           </div>
         </div>
       </div>
@@ -52,15 +44,8 @@
             <label class="form-label m-0">數量</label>
             <div class="input-group" style="max-width: 180px;">
               <button class="btn btn-outline-secondary" type="button" id="qtyMinus" @click="dec">−</button>
-              <input
-                id="qty"
-                type="number"
-                class="form-control text-center"
-                min="1"
-                step="1"
-                v-model.number="state.qty"
-                @input="normalizeQty"
-              />
+              <input id="qty" type="number" class="form-control text-center" min="1" step="1" v-model.number="state.qty"
+                @input="normalizeQty" />
               <button class="btn btn-outline-secondary" type="button" id="qtyPlus" @click="inc">＋</button>
             </div>
 
@@ -73,13 +58,8 @@
           </div>
 
           <div class="d-flex flex-wrap gap-3">
-            <button
-              id="btn-addToCart"
-              class="btn btn-primary btn-lg"
-              type="button"
-              :disabled="stockState === 'out'"
-              @click="onAddToCart"
-            >
+            <button id="btn-addToCart" class="btn btn-primary btn-lg" type="button" :disabled="stockState === 'out'"
+              @click="onAddToCart">
               {{ stockState === 'out' ? '補貨中' : '加入購物車' }}
             </button>
             <RouterLink to="/shop/commodity" class="btn btn-outline-secondary">回商品列表</RouterLink>
@@ -93,17 +73,10 @@
 
     <!-- Toast 容器（右下角） -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080">
-      <div
-        id="tipToast"
-        class="toast align-items-center shadow"
-        role="alert"
-        aria-live="assertive"
-        aria-atomic="true"
-        style="background:#fff; border:3px solid #d19f72; border-radius:12px;"
-      >
+      <div id="tipToast" class="toast align-items-center shadow" role="alert" aria-live="assertive" aria-atomic="true"
+        style="background: #22c55e; color: white; border-radius:12px;">
         <div class="d-flex">
           <div class="toast-body" id="toastText">已加入購物車</div>
-          <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
       </div>
     </div>
@@ -176,9 +149,9 @@ async function addOrUpdateCart(userId, productId, addQty) {
     : null
 
   if (found) {
-    const cartId   = Number(found.cartId ?? found.cart_id)
+    const cartId = Number(found.cartId ?? found.cart_id)
     const currentQ = Number(found.quantity ?? found.qty ?? 0)
-    const targetQ  = currentQ + Number(addQty ?? 0)
+    const targetQ = currentQ + Number(addQty ?? 0)
     if (typeof state.stock === 'number' && targetQ > state.stock) throw new Error('超過庫存數量')
     await http.put('/api/cart/update', { cartId, quantity: Math.max(1, targetQ) })
   } else {
@@ -199,20 +172,22 @@ async function onAddToCart() {
       const back = router.currentRoute.value.fullPath
       return router.push({ name: 'login', query: { redirect: back } })
     }
+
     const pid = state.productId ?? state.id
     if (!pid) throw new Error('商品資料未載入完成')
 
     await addOrUpdateCart(user.userId, pid, state.qty)
-    await cartStore.refresh(userId)
-    // ✅ 刷新 Pinia 購物車（Navbar 徽章會更新）
-    try { await cart.refresh?.(user.userId) } catch {}
+
+    // ✅ 刷新 Pinia 購物車（Navbar 徽章會更新；若沒有 refresh 就略過）
+    if (typeof cart.refresh === 'function') {
+      await cart.refresh(user.userId)
+    }
 
     showToast('已加入購物車', { bold: true })
   } catch (e) {
     showToast(e?.message || '❌ 加入失敗，請稍後再試')
   }
 }
-
 /* ---------- 載入商品 ---------- */
 async function loadProduct() {
   const id = route.params.id || new URLSearchParams(location.search).get('id')
@@ -244,5 +219,7 @@ onMounted(loadProduct)
 </script>
 
 <style scoped>
-.thumb.active { outline: 2px solid #0d6efd; }
+.thumb.active {
+  outline: 2px solid #0d6efd;
+}
 </style>
