@@ -72,7 +72,7 @@ import http from '@/utils/http'
 import { useUploadJobStore } from '@/stores/uploadJob'
 
 // ==== HF 設定（與上頁一致即可）====
-const HF_TOKEN = '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'
+const HF_TOKEN = ''
 const HF_API_URL = 'https://api-inference.huggingface.co/models/google/vit-base-patch16-224'
 const ANIMAL_KEYS = ['dog','cat','puppy','kitten','canine','feline','animal','mammal','rabbit','bunny','hamster','mouse','rat','parrot','bird','guinea pig','fish','reptile','lizard','snake','turtle','ferret','hedgehog','pet']
 const SCORE_BAR = 0.30
