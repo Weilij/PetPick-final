@@ -6,7 +6,7 @@
         <span class="fw-semibold">PetPick</span>
       </RouterLink>
 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      <button ref="togglerRef" class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -111,7 +111,7 @@ import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
 import Realtime from '@/common/realtime'
 import axios from '@/utils/http'
-import { Dropdown } from 'bootstrap'
+import { Dropdown, Collapse} from 'bootstrap'
 
 const user = useUserStore()
 const cart = useCartStore()
@@ -119,8 +119,9 @@ const route = useRoute()
 const router = useRouter()
 
 const accountBtnRef = ref(null)
+const togglerRef = ref(null) 
 let dd = null
-
+let navCollapse = null
 let disposeRealtime = null
 let realtimeStarted = false
 
@@ -150,6 +151,17 @@ onMounted(() => {
       dd = Dropdown.getOrCreateInstance(accountBtnRef.value, { autoClose: true })
     }
   })
+
+  const el = document.getElementById('navbarNav')
+  if (el) {
+    navCollapse = Collapse.getOrCreateInstance(el, { toggle: false })
+  }
+
+  togglerRef.value?.addEventListener('click', () => navCollapse?.toggle?.())
+})
+
+watch(() => route.fullPath, () => {
+  navCollapse?.hide?.() // 切頁自動收起
 })
 
 watch(
@@ -187,6 +199,7 @@ onUnmounted(() => {
     dd.dispose()
     dd = null
   }
+  navCollapse = null
   if (typeof disposeRealtime === 'function') disposeRealtime()
   disposeRealtime = null
   realtimeStarted = false
