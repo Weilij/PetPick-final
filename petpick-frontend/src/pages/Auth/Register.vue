@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import axios from '@/utils/http' // 你專案的 axios 包裝；若沒有可改成直接 import axios from 'axios'
+import http from '@/utils/http'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -124,20 +124,39 @@ async function onSubmit () {
     return
   }
 
+  // 基本驗證
+  if (form.value.password.length < 6) {
+    errorMessage.value = '密碼長度至少需要 6 個字元'
+    return
+  }
+
   submitting.value = true
   try {
-    // 後端若仍是 Spring 的 /register，可直接打此路徑
-await axios.post('/api/auth/register', {
+    const response = await http.post('/api/auth/register', {
       username: form.value.username,
       accountemail: form.value.accountemail,
       phonenumber: form.value.phonenumber,
       password: form.value.password
     })
 
-    successMessage.value = '註冊成功，將為你導向登入頁…'
-    setTimeout(() => router.push({ path: '/login' }), 1000)
+    console.log('✅ 註冊成功:', response.data)
+    successMessage.value = '註冊成功，記得先至會員中心修改資料喔,導向登入頁...'
+    setTimeout(() => router.push({ path: '/login' }), 2000)
+    
   } catch (err) {
-    errorMessage.value = (err?.response?.data?.message) || '註冊失敗，請稍後再試'
+    console.error('❌ 註冊失敗:', err)
+    console.error('錯誤回應:', err.response?.data)
+    
+    // 更詳細的錯誤處理
+    if (err.response?.data?.message) {
+      errorMessage.value = err.response.data.message
+    } else if (err.response?.status === 400) {
+      errorMessage.value = '註冊資料有誤，請檢查後重試'
+    } else if (err.response?.status === 409) {
+      errorMessage.value = '用戶名或信箱已被註冊，請使用其他資料'
+    } else {
+      errorMessage.value = '註冊失敗，請稍後再試'
+    }
   } finally {
     submitting.value = false
   }
