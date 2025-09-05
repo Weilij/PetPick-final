@@ -9,6 +9,7 @@ const MissionMain = () => import('../pages/Mission/MissionMain.vue')
 const MissionDetail = () => import('../pages/Mission/MissionDetail.vue')
 const MissionUpload = () => import('../pages/Mission/MissionUpload.vue')
 const MissionApplication = () => import('../pages/Mission/MissionApplication.vue')
+const MissionUploadReview = () => import('@/pages/Mission/MissionUploadReview.vue')
 
 // Chat
 const Chat = () => import('../pages/Chat/Chat.vue')
@@ -60,6 +61,8 @@ const router = createRouter({
     { path: '/missions/:id', name: 'missionDetail', component: MissionDetail, props: true },
     { path: '/missions/upload', name: 'missionUpload', component: MissionUpload, meta: { requiresAuth: true } },
     { path: '/missions/application', name: 'missionApplication', component: MissionApplication, meta: { requiresAuth: true } },
+    { path: '/missions/upload/review', name: 'missionUploadReview', component: MissionUploadReview, meta: { requiresAuth: true } },
+    
 
     // Account
     { path: '/login', name: 'login', component: Login },
